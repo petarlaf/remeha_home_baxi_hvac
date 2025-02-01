@@ -51,18 +51,24 @@ class RemehaHomeAPI:
             },
         )
 
-    async def async_get_dashboard(self) -> dict:
-        """Return the Remeha Home dashboard JSON."""
-        # Add a timestamp to the request to prevent caching
-        timestamp = int(datetime.datetime.now().timestamp())
+    async def async_set_operating_mode(self, appliance_id: str, mode: str) -> None:
+        """Set the operating mode for an appliance.
+        
+        HVACMode.HEAT: mode should be "AutomaticCoolingHeating"
+        HVACMode.COOL: mode should be "ForcedCooling"
+        """
         response = await self._async_api_request(
-            "GET", f"/homes/dashboard?t={timestamp}"
+            "POST",
+            f"/appliances/{appliance_id}/operatingmode",
+            json={"operatingMode": mode},
         )
         response.raise_for_status()
-        return await response.json()
 
     async def async_set_manual(self, climate_zone_id: str, setpoint: float):
-        """Set a climate zone to manual mode with a specific temperature setpoint."""
+        """Set a climate zone to manual mode with a specific temperature setpoint.
+        
+        (This is now a preset.)
+        """
         response = await self._async_api_request(
             "POST",
             f"/climate-zones/{climate_zone_id}/modes/manual",
@@ -75,7 +81,7 @@ class RemehaHomeAPI:
     async def async_set_schedule(self, climate_zone_id: str, heating_program_id: int):
         """Set a climate zone to schedule mode.
 
-        The supplied heating program id should match the current heating program id.
+        The heating program id can be 1, 2 or 3 for Schedule1, Schedule2 or Schedule3.
         """
         response = await self._async_api_request(
             "POST",
@@ -83,6 +89,14 @@ class RemehaHomeAPI:
             json={
                 "heatingProgramId": heating_program_id,
             },
+        )
+        response.raise_for_status()
+
+    async def async_set_off(self, climate_zone_id: str):
+        """Set a climate zone to off (anti-frost mode)."""
+        response = await self._async_api_request(
+            "POST",
+            f"/climate-zones/{climate_zone_id}/modes/anti-frost",
         )
         response.raise_for_status()
 
@@ -97,32 +111,15 @@ class RemehaHomeAPI:
         )
         response.raise_for_status()
 
-    async def async_set_off(self, climate_zone_id: str):
-        """Set a climate zone to off."""
+    async def async_get_dashboard(self) -> dict:
+        """Return the Remeha Home dashboard JSON."""
+        # Add a timestamp to the request to prevent caching
+        timestamp = int(datetime.datetime.now().timestamp())
         response = await self._async_api_request(
-            "POST",
-            f"/climate-zones/{climate_zone_id}/modes/anti-frost",
+            "GET", f"/homes/dashboard?t={timestamp}"
         )
         response.raise_for_status()
-
-    async def async_activate_heating_time_program(
-        self, climate_zone_id: str, time_program_id: int
-    ):
-        """Set a climate zone to schedule mode with a specific time program."""
-        response = await self._async_api_request(
-            "POST",
-            f"/climate-zones/{climate_zone_id}/time-programs/heating/{time_program_id}/activate",
-        )
-        response.raise_for_status()
-
-    async def async_set_fireplace_mode(self, climate_zone_id: str, enabled: bool):
-        """Set fireplace mode for a climate zone."""
-        response = await self._async_api_request(
-            "POST",
-            f"/climate-zones/{climate_zone_id}/modes/fireplacemode",
-            json={"fireplaceModeActive": enabled},
-        )
-        response.raise_for_status()
+        return await response.json()
 
     async def async_get_appliance_technical_information(
         self, appliance_id: str
@@ -136,7 +133,7 @@ class RemehaHomeAPI:
         return await response.json()
 
     async def async_get_consumption_data_for_today(self, appliance_id: str) -> dict:
-        """Get technical information for an appliance."""
+        """Get consumption data for an appliance for today."""
         today = datetime.datetime.now().replace(
             hour=0, minute=0, second=0, microsecond=0
         )
