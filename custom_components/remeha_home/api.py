@@ -149,6 +149,68 @@ class RemehaHomeAPI:
         response.raise_for_status()
         return await response.json()
 
+    async def async_set_hot_water_boost(self, hot_water_zone_id: str) -> None:
+        """Activate Boost mode for a given hot water zone.
+        
+        Boost mode boosts the hot water to the comfort target set point for 30 minutes.
+        """
+        response = await self._async_api_request(
+            "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/boost"
+        )
+        response.raise_for_status()
+
+    async def async_set_hot_water_schedule(self, hot_water_zone_id: str) -> None:
+        """Activate Scheduled mode for a given hot water zone.
+        
+        This sets the zone's mode to scheduled using the appropriate endpoint.
+        """
+        response = await self._async_api_request(
+            "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/schedule"
+        )
+        response.raise_for_status()
+
+    async def async_set_hot_water_comfort(self, hot_water_zone_id: str) -> None:
+        """Activate Comfort mode for a given hot water zone.
+        
+        This mode uses the continuous comfort endpoint.
+        """
+        response = await self._async_api_request(
+            "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/continuous-comfort"
+        )
+        response.raise_for_status()
+
+    async def async_set_hot_water_eco(self, hot_water_zone_id: str) -> None:
+        """Activate Eco mode for a given hot water zone.
+        
+        This sets the mode to anti-frost (eco) mode.
+        """
+        response = await self._async_api_request(
+            "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/anti-frost"
+        )
+        response.raise_for_status()
+
+    async def async_set_hot_water_comfort_setpoint(self, hot_water_zone_id: str, temperature: float) -> None:
+        """Set a new comfort setpoint temperature for a hot water zone.
+        
+        This sends a payload with {"comfortSetpoint": <temperature>}.
+        """
+        payload = {"comfortSetpoint": temperature}
+        response = await self._async_api_request(
+            "POST", f"/hot-water-zones/{hot_water_zone_id}/comfort-setpoint", json=payload
+        )
+        response.raise_for_status()
+
+    async def async_set_hot_water_reduced_setpoint(self, hot_water_zone_id: str, temperature: float) -> None:
+        """Set a new reduced (eco) setpoint temperature for a hot water zone.
+        
+        This sends a payload with {"reducedSetpoint": <temperature>}.
+        """
+        payload = {"reducedSetpoint": temperature}
+        response = await self._async_api_request(
+            "POST", f"/hot-water-zones/{hot_water_zone_id}/reduced-setpoint", json=payload
+        )
+        response.raise_for_status()
+
 
 class RemehaHomeAuthFailed(Exception):
     """Error to indicate that authentication failed."""
