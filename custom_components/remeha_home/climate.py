@@ -23,7 +23,7 @@ from .coordinator import RemehaHomeUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# New mappings for operating mode and HVAC modes
+# New mappings for operating mode and HVAC modes (we have removed FrostProtection)
 OPERATING_MODE_TO_HVAC_MODE = {
     "AutomaticCoolingHeating": HVACMode.HEAT,
     "ForcedCooling": HVACMode.COOL,
@@ -37,6 +37,13 @@ HVAC_MODE_TO_OPERATING_MODE = {
 
 # Allowed preset modes
 ALLOWED_PRESET_MODES = ["manual", "schedule1", "schedule2", "schedule3"]
+
+# New mapping for HVAC action based on activeComfortDemand returned from the API.
+REMEHA_STATUS_TO_HVAC_ACTION = {
+    "ProducingHeat": HVACAction.HEATING,
+    "Idle": HVACAction.IDLE,
+    "ProducingCold": HVACAction.COOLING,
+}
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -129,16 +136,18 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         If an override is set (from a recent change), return it. Otherwise, first try to pull
         the operating mode from the zone data; if missing, fall back to the appliance data.
         """
-        # If we have recently requested a change, use it.
+        # Use the override if available
         if self._requested_hvac_mode is not None:
             return self._requested_hvac_mode
 
         zone_data = self._data
         operating_mode = zone_data.get("operatingMode")
         if operating_mode is None:
-            # Fall back to the appliance's operating mode if not present in zone data.
+            # Fallback to the appliance's operating mode
             appliance_data = self.coordinator.get_by_id(self.appliance_id)
-            operating_mode = appliance_data.get("operatingMode", "FrostProtection")
+            operating_mode = appliance_data.get("operatingMode")
+        if operating_mode is None:
+            return HVACMode.OFF
         return OPERATING_MODE_TO_HVAC_MODE.get(operating_mode, HVACMode.OFF)
 
     @property
@@ -148,9 +157,24 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
     @property
     def hvac_action(self) -> HVACAction | str | None:
-        """Return hvac action (if supported by your device state)."""
+        """Return HVAC action based on the activeComfortDemand.
+
+        Uses the activeComfortDemand value which is returned from the API call
+        to https://api.bdrthermea.net/Mobile/api/homes/dashboard. The mapping is:
+          "ProducingHeat" -> HVACAction.HEATING
+          "Idle" -> HVACAction.IDLE
+          "ProducingCold" -> HVACAction.COOLING
+        """
+        active_comfort = self._data.get("activeComfortDemand")
+        if active_comfort in REMEHA_STATUS_TO_HVAC_ACTION:
+            return REMEHA_STATUS_TO_HVAC_ACTION[active_comfort]
+        # Fallback logic:
         if self.hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
+        elif self.hvac_mode == HVACMode.HEAT:
+            return HVACAction.HEATING
+        elif self.hvac_mode == HVACMode.COOL:
+            return HVACAction.COOLING
         return HVACAction.IDLE
 
     @property
@@ -179,7 +203,7 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature.
-        
+
         When updating the temperature while in manual preset mode we call the manual API.
         """
         if (temperature := kwargs.get(ATTR_TEMPERATURE)) is not None:
@@ -190,7 +214,7 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new HVAC operating mode.
-        
+
         For HEAT and COOL we use the operating mode API on the appliance.
         For OFF we use the existing off API on the zone.
         """
@@ -232,7 +256,6 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
         Once new data is fetched we clear our temporary override if the actual state has changed.
         """
-        # Check if the fresh data from the coordinator reflects a new operating mode.
         zone_data = self._data
         operating_mode = zone_data.get("operatingMode")
         if operating_mode is not None:
