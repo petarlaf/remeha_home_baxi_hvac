@@ -1,3 +1,11 @@
+This is a custom fork of the original remaha home integration - https://github.com/msvisser/remeha_home/tree/main - by msvisser. 
+
+I have a BAXI HVAC system and Hot water boiler - and the original integration didnt' really work for me. I've completely remapped how the climate modes and presets are mapped and set; and how we read the current mode status. I've also created a new hot water entity that now allows you switch between Boost, Eco, Comfort and Scheduled.
+
+All the code is done using AI (as I'm not a developer and I've done this the best I can).
+
+The API documentation requires updating and there are a few tweaks I want to do to the hot water entity. But so far this integration fulfills 99% of my needs.
+
 # Remeha Home integration for Home Assistant
 This integration lets you control your Remeha Home thermostats from Home Assistant.
 
@@ -7,36 +15,6 @@ If you are unable to use the Remeha Home app for your thermostat, this integrati
 There have been reports by users that this intergration will also work for Baxi, De Dietrich, and Brötje systems (and possibly other BDR Thermea products).
 You can simply log in using the credentials that you would use in the respective apps.
 
-## Current features
-- All climate zones are exposed as [climate](https://www.home-assistant.io/integrations/climate/) entities with:
-    - The following modes:
-        - Auto mode: the thermostat will follow the clock program.
-        If the target temperature is changed, it will temporarily override the clock program until the next target temperature change in the schedule.
-        - Heat mode: the thermostat will be set to manual mode and continuously hold the set temperature.
-        - Off mode: the thermostat is disabled.
-    - Three presets for the three clock programs available in the Remeha Home app.
-    When a preset is selected, the integration will automatically switch the climate zone to auto mode to make sure the preset is applied.
-- Each climate zone also exposes the following sensors/switches:
-    - The next schedule setpoint
-    - The time at which the next schedule setpoint gets activated
-    - The current schedule setpoint
-    - Switch to control fireplace mode
-- Each hot water zone exposes the following sensors:
-    - The water temperature
-- Each appliance (CV-ketel) exposes the following sensors:
-    - The water pressure
-
-## Installation
-
-### Install with HACS (recommended)
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=msvisser&repository=remeha_home&category=integration)
-
-Do you have [HACS](https://hacs.xyz/) installed?
-Click the button or follow the instructions.
-1. Search integrations for **Remeha Home**
-1. Click `Install`
-1. Restart Home Assistant
-1. See [Setup](#setup)
 
 ### Install manually
 
@@ -52,5 +30,4 @@ Click the button or follow the instructions.
 1. Click "Next"
 1. Enjoy
 
-## API documentation
-For information on the Remeha Home API see [API documentation](documentation/api.md).
+
