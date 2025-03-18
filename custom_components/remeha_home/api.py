@@ -153,11 +153,17 @@ class RemehaHomeAPI:
         """Activate Boost mode for a given hot water zone.
         
         Boost mode boosts the hot water to the comfort target set point for 30 minutes.
+        Note: This mode can only be activated when the hot water zone is in Scheduled mode.
         """
-        response = await self._async_api_request(
-            "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/boost"
-        )
-        response.raise_for_status()
+        try:
+            response = await self._async_api_request(
+                "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/boost"
+            )
+            response.raise_for_status()
+            _LOGGER.debug("Successfully activated Boost mode for hot water zone %s", hot_water_zone_id)
+        except Exception as err:
+            _LOGGER.error("Failed to activate Boost mode for hot water zone %s: %s", hot_water_zone_id, err)
+            raise
 
     async def async_set_hot_water_schedule(self, hot_water_zone_id: str) -> None:
         """Activate Scheduled mode for a given hot water zone.

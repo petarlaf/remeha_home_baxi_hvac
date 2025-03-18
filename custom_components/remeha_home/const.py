@@ -119,6 +119,12 @@ HOT_WATER_ZONE_SENSOR_TYPES = [
         name="Status",
         entity_registry_enabled_default=False,
     ),
+    SensorEntityDescription(
+        key="boostModeEndTime",
+        name="Boost Mode End Time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_registry_enabled_default=True,
+    ),
 ]
 
 CLIMATE_ZONE_BINARY_SENSOR_TYPES = [

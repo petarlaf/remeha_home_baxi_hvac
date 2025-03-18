@@ -15,6 +15,13 @@ If you are unable to use the Remeha Home app for your thermostat, this integrati
 There have been reports by users that this intergration will also work for Baxi, De Dietrich, and Brötje systems (and possibly other BDR Thermea products).
 You can simply log in using the credentials that you would use in the respective apps.
 
+## Hot Water Control
+This integration provides a water heater entity that supports the following modes:
+- **Scheduled** - Follows the programmed schedule for water heating
+- **Comfort** - Maintains water at comfort temperature continuously
+- **Eco** - Maintains water at reduced temperature (anti-frost)
+- **Boost** - Temporarily boosts water heating to comfort temperature for 30 minutes
+  - **Note:** Boost mode can only be activated when the water heater is in Scheduled mode, matching the behavior of the official mobile app
 
 ### Install manually
 
@@ -29,5 +36,3 @@ You can simply log in using the credentials that you would use in the respective
 1. Enter your email address and password
 1. Click "Next"
 1. Enjoy
-
-
