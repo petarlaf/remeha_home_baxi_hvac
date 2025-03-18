@@ -189,6 +189,10 @@ Switch to the Schedule mode for the hot water zone.
 ## POST `/hot-water-zones/{hot_water_zone_id}/modes/continuous-comfort`
 Switch to the Comfort mode for the hot water zone.
 
+## POST `/hot-water-zones/{hot_water_zone_id}/modes/boost`
+Activate the Boost mode for the hot water zone. This boosts the hot water to the comfort target set point for 30 minutes.
+Note: This mode can only be activated when the hot water zone is currently in Schedule mode.
+
 ## POST `/hot-water-zones/{hot_water_zone_id}/reduced-setpoint`
 Set the target temperature of the Eco mode for the hot water zone.
 

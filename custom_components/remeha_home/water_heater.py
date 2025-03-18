@@ -56,17 +56,24 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
-    """Representation of a Water Heater for a Remeha Home hot water zone."""
+    """Representation of a Water Heater for a Remeha Home hot water zone.
+    
+    Operation modes:
+    - Boost: Temporarily boosts water heating to comfort temperature for 30 minutes.
+             Only available when the current mode is Scheduled.
+    - Scheduled: Follows the programmed schedule for water heating.
+    - Comfort: Maintains water at comfort temperature continuously.
+    - Eco: Maintains water at reduced temperature (anti-frost).
+    """
 
     _attr_unit_of_measurement = UnitOfTemperature.CELSIUS
     # Support target temperature and operation mode control.
-    # New available modes: Boost, Scheduled, Comfort, and Eco.
+    # Available modes: Boost (only when in Scheduled mode), Scheduled, Comfort, and Eco.
     _attr_supported_features = (
         WaterHeaterEntityFeature.TARGET_TEMPERATURE |
         WaterHeaterEntityFeature.OPERATION_MODE
     )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_operation_list = ["Boost", "Scheduled", "Comfort", "Eco"]
 
     def __init__(
         self,
@@ -165,6 +172,48 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         }
         return mode_mapping.get(raw_mode.lower(), raw_mode)
 
+    @property
+    def extra_state_attributes(self) -> dict[str, any]:
+        """Return additional state attributes for the water heater entity."""
+        attributes = {}
+        
+        # Add remaining boost time if in boost mode
+        if self.current_operation == "Boost":
+            boost_end_time = self._data.get("boostModeEndTime")
+            if boost_end_time:
+                try:
+                    # Parse the ISO format datetime string
+                    from datetime import datetime
+                    import pytz
+                    
+                    # Convert to datetime object
+                    end_time = datetime.fromisoformat(boost_end_time.replace('Z', '+00:00'))
+                    
+                    # Get current time in UTC
+                    now = datetime.now(pytz.UTC)
+                    
+                    # Calculate remaining time in minutes
+                    remaining_seconds = (end_time - now).total_seconds()
+                    if remaining_seconds > 0:
+                        remaining_minutes = int(remaining_seconds / 60)
+                        attributes["remaining_boost_time"] = f"{remaining_minutes} minutes"
+                except Exception as e:
+                    _LOGGER.warning("Error calculating remaining boost time: %s", e)
+        
+        return attributes
+
+    @property
+    def operation_list(self) -> list[str]:
+        """Return the list of available operation modes.
+        
+        Boost mode is only available when the current mode is Scheduled.
+        """
+        current_mode = self.current_operation
+        if current_mode == "Scheduled":
+            return ["Boost", "Scheduled", "Comfort", "Eco"]
+        else:
+            return ["Scheduled", "Comfort", "Eco"]
+
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set a new target temperature for the water heater.
 
@@ -192,7 +241,7 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         """Set a new operation mode for the water heater.
 
         Depending on the mode selected, the corresponding API endpoint is called:
-          - Boost -> /modes/boost
+          - Boost -> /modes/boost (only available when current mode is "Scheduled")
           - Scheduled -> /modes/schedule
           - Comfort -> /modes/continuous-comfort
           - Eco -> /modes/anti-frost
@@ -200,6 +249,11 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         _LOGGER.debug("Setting hot water operation mode to %s", operation_mode)
         op_mode = operation_mode.lower()
         if op_mode == "boost":
+            # Check if the current mode is "Scheduled" before allowing Boost mode
+            current_mode = self.current_operation
+            if current_mode != "Scheduled":
+                _LOGGER.warning("Boost mode can only be activated when in Scheduled mode. Current mode: %s", current_mode)
+                return
             await self.api.async_set_hot_water_boost(self.hot_water_zone_id)
         elif op_mode == "scheduled":
             await self.api.async_set_hot_water_schedule(self.hot_water_zone_id)
