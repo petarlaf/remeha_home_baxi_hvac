@@ -1,12 +1,11 @@
-"""
-Water Heater platform for Remeha Home hot water zones.
+"""Water Heater platform for Remeha Home hot water zones.
 
 Based on the data provided by the dashboard API, the relevant fields are:
   - current temperature: "dhwTemperature"
   - target temperature: "targetSetpoint"
   - min/max temperature: "setPointMin"/"setPointMax" (optional)
   - current operation mode: "dhwZoneMode" (e.g. Scheduling, Comfort, Eco, or Boost)
-  
+
 To fully support control, ensure that the RemehaHomeAPI class implements:
   - async_set_hot_water_temperature(hot_water_zone_id: str, temperature: float)
   - async_set_hot_water_boost(hot_water_zone_id: str)
@@ -57,7 +56,7 @@ async def async_setup_entry(
 
 class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     """Representation of a Water Heater for a Remeha Home hot water zone.
-    
+
     Operation modes:
     - Boost: Temporarily boosts water heating to comfort temperature for 30 minutes.
              Only available when the current mode is Scheduled.
@@ -104,8 +103,7 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
     @property
     def target_temperature(self) -> float | None:
-        """
-        Return the current target setpoint temperature depending on the active mode.
+        """Return the current target setpoint temperature depending on the active mode.
 
         - For Scheduled mode, use "targetSetpoint" from the API.
         - For Eco mode, use "reducedSetpoint".
@@ -176,7 +174,7 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     def extra_state_attributes(self) -> dict[str, any]:
         """Return additional state attributes for the water heater entity."""
         attributes = {}
-        
+
         # Add remaining boost time if in boost mode
         if self.current_operation == "Boost":
             boost_end_time = self._data.get("boostModeEndTime")
@@ -185,13 +183,13 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                     # Parse the ISO format datetime string
                     from datetime import datetime
                     import pytz
-                    
+
                     # Convert to datetime object
                     end_time = datetime.fromisoformat(boost_end_time.replace('Z', '+00:00'))
-                    
+
                     # Get current time in UTC
                     now = datetime.now(pytz.UTC)
-                    
+
                     # Calculate remaining time in minutes
                     remaining_seconds = (end_time - now).total_seconds()
                     if remaining_seconds > 0:
@@ -199,13 +197,13 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                         attributes["remaining_boost_time"] = f"{remaining_minutes} minutes"
                 except Exception as e:
                     _LOGGER.warning("Error calculating remaining boost time: %s", e)
-        
+
         return attributes
 
     @property
     def operation_list(self) -> list[str]:
         """Return the list of available operation modes.
-        
+
         Boost mode is only available when the current mode is Scheduled.
         """
         current_mode = self.current_operation

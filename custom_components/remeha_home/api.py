@@ -53,7 +53,7 @@ class RemehaHomeAPI:
 
     async def async_set_operating_mode(self, appliance_id: str, mode: str) -> None:
         """Set the operating mode for an appliance.
-        
+
         HVACMode.HEAT: mode should be "AutomaticCoolingHeating"
         HVACMode.COOL: mode should be "ForcedCooling"
         """
@@ -66,7 +66,7 @@ class RemehaHomeAPI:
 
     async def async_set_manual(self, climate_zone_id: str, setpoint: float):
         """Set a climate zone to manual mode with a specific temperature setpoint.
-        
+
         (This is now a preset.)
         """
         response = await self._async_api_request(
@@ -151,7 +151,7 @@ class RemehaHomeAPI:
 
     async def async_set_hot_water_boost(self, hot_water_zone_id: str) -> None:
         """Activate Boost mode for a given hot water zone.
-        
+
         Boost mode boosts the hot water to the comfort target set point for 30 minutes.
         Note: This mode can only be activated when the hot water zone is in Scheduled mode.
         """
@@ -167,7 +167,7 @@ class RemehaHomeAPI:
 
     async def async_set_hot_water_schedule(self, hot_water_zone_id: str) -> None:
         """Activate Scheduled mode for a given hot water zone.
-        
+
         This sets the zone's mode to scheduled using the appropriate endpoint.
         """
         response = await self._async_api_request(
@@ -177,7 +177,7 @@ class RemehaHomeAPI:
 
     async def async_set_hot_water_comfort(self, hot_water_zone_id: str) -> None:
         """Activate Comfort mode for a given hot water zone.
-        
+
         This mode uses the continuous comfort endpoint.
         """
         response = await self._async_api_request(
@@ -187,7 +187,7 @@ class RemehaHomeAPI:
 
     async def async_set_hot_water_eco(self, hot_water_zone_id: str) -> None:
         """Activate Eco mode for a given hot water zone.
-        
+
         This sets the mode to anti-frost (eco) mode.
         """
         response = await self._async_api_request(
@@ -197,7 +197,7 @@ class RemehaHomeAPI:
 
     async def async_set_hot_water_comfort_setpoint(self, hot_water_zone_id: str, temperature: float) -> None:
         """Set a new comfort setpoint temperature for a hot water zone.
-        
+
         This sends a payload with {"comfortSetpoint": <temperature>}.
         """
         payload = {"comfortSetpoint": temperature}
@@ -208,7 +208,7 @@ class RemehaHomeAPI:
 
     async def async_set_hot_water_reduced_setpoint(self, hot_water_zone_id: str, temperature: float) -> None:
         """Set a new reduced (eco) setpoint temperature for a hot water zone.
-        
+
         This sends a payload with {"reducedSetpoint": <temperature>}.
         """
         payload = {"reducedSetpoint": temperature}
