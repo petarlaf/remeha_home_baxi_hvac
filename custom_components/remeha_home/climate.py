@@ -180,8 +180,8 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
     @property
     def preset_mode(self) -> str | None:
         """Return the preset mode.
-        
-        Mapping: if the zone is in manual mode then preset is 'manual'. 
+
+        Mapping: if the zone is in manual mode then preset is 'manual'.
         Otherwise if in schedule mode, then based on the active heating program number.
         """
         zone_mode = self._data.get("zoneMode")
@@ -234,7 +234,7 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode.
 
-        For 'manual' we call the manual API (and pass the current target temperature).  
+        For 'manual' we call the manual API (and pass the current target temperature).
         For 'schedule1', 'schedule2' or 'schedule3' we call the schedule API specifying the corresponding heating program id.
         """
         _LOGGER.debug("Setting preset mode to %s", preset_mode)
