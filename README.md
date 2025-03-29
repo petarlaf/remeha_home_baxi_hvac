@@ -1,38 +1,86 @@
-This is a custom fork of the original remaha home integration - https://github.com/msvisser/remeha_home/tree/main - by msvisser. 
+# Remeha Home / Baxi HVAC Integration for Home Assistant (Custom Fork)
 
-I have a BAXI HVAC system and Hot water boiler - and the original integration didnt' really work for me. I've completely remapped how the climate modes and presets are mapped and set; and how we read the current mode status. I've also created a new hot water entity that now allows you switch between Boost, Eco, Comfort and Scheduled.
+This is a **custom fork** of the original Remeha Home integration by **msvisser** ([msvisser/remeha_home](https://github.com/msvisser/remeha_home)).
 
-All the code is done using AI (as I'm not a developer and I've done this the best I can).
+This fork was created because the original integration did not fully support the user's **BAXI HVAC system** (heating, cooling) and **Hot Water Boiler**.
 
-The API documentation requires updating and there are a few tweaks I want to do to the hot water entity. But so far this integration fulfills 99% of my needs.
+## Key Changes in this Fork
 
-# Remeha Home integration for Home Assistant
-This integration lets you control your Remeha Home thermostats from Home Assistant.
+*   **Climate Entity (`climate.remeha_home`)**:
+    *   Remapped HVAC modes: `HEAT` (`AutomaticCoolingHeating`), `COOL` (`ForcedCooling`), `OFF` (`FrostProtection`).
+    *   Remapped Preset modes: `manual`, `schedule1`, `schedule2`, `schedule3`. Control logic adjusted for these modes.
+    *   Improved HVAC Action detection based on the API's `activeComfortDemand` status (`ProducingHeat`, `Idle`, `ProducingCold`).
+*   **Water Heater Entity (`water_heater.remeha_home`)**:
+    *   Introduced full support for hot water control.
+    *   Supports operation modes: `Scheduled`, `Comfort`, `Eco` (Anti-Frost), and `Boost`.
+    *   Allows setting target temperatures specifically for `Comfort` and `Eco` modes.
+    *   `Boost` mode can only be activated when the system is in `Scheduled` mode (matching app behavior) and displays remaining boost time.
 
-**Before using this integration, make sure you have set up your thermostat in the [Remeha Home](https://play.google.com/store/apps/details?id=com.bdrthermea.application.remeha) app.**
-If you are unable to use the Remeha Home app for your thermostat, this integration will not work.
+**Note:** The development of this fork was assisted by AI, as the author is not a developer. While functional for the author's needs, further refinements or bug fixes might be required.
 
-There have been reports by users that this intergration will also work for Baxi, De Dietrich, and Brötje systems (and possibly other BDR Thermea products).
-You can simply log in using the credentials that you would use in the respective apps.
+---
 
-## Hot Water Control
-This integration provides a water heater entity that supports the following modes:
-- **Scheduled** - Follows the programmed schedule for water heating
-- **Comfort** - Maintains water at comfort temperature continuously
-- **Eco** - Maintains water at reduced temperature (anti-frost)
-- **Boost** - Temporarily boosts water heating to comfort temperature for 30 minutes
-  - **Note:** Boost mode can only be activated when the water heater is in Scheduled mode, matching the behavior of the official mobile app
+## Original Integration Information
 
-### Install manually
+This integration lets you control your Remeha Home thermostats (and compatible BDR Thermea brands) from Home Assistant.
 
-1. Install this platform by creating a `custom_components` folder in the same folder as your configuration.yaml, if it doesn't already exist.
-2. Create another folder `remeha_home` in the `custom_components` folder. Copy all files from `custom_components/remeha_home` into the `remeha_home` folder.
+**Before using this integration, make sure you have set up your thermostat in the [Remeha Home app](https://play.google.com/store/apps/details?id=com.bdrthermea.application.remeha) (or the equivalent app for your brand).** If you cannot use the official app, this integration will likely not work.
+
+It has been reported that this integration may also work for **Baxi**, **De Dietrich**, and **Brötje** systems. You can log in using the same credentials you use for your brand's specific app.
+
+## Provided Entities
+
+This integration creates the following entities:
+
+*   **Climate:** Controls the main heating/cooling zone.
+    *   Allows setting target temperature.
+    *   Supports HVAC Modes: Heat, Cool, Off.
+    *   Supports Preset Modes: Manual, Schedule1, Schedule2, Schedule3.
+*   **Water Heater:** Controls the domestic hot water zone.
+    *   Allows setting target temperature (in Comfort/Eco modes).
+    *   Supports Operation Modes: Scheduled, Comfort, Eco, Boost.
+    *   Displays current water temperature.
+*   **Sensors:** Various sensors providing information like:
+    *   Room Temperature
+    *   Outdoor Temperature
+    *   Water Pressure
+    *   Energy Consumption (Heating, Hot Water, Cooling - updated approx. every 15 mins)
+*   **Binary Sensors:** Indicate status like:
+    *   Frost Protection Active
+    *   Heating Status
+    *   Hot Water Status
+*   **Switches:** May include switches for specific functions if applicable to your system (e.g., enabling/disabling certain modes - check your specific device).
+
+## Installation
+
+### HACS (Recommended)
+
+1.  Add this repository as a custom repository in HACS (Home Assistant Community Store).
+2.  Search for "Remeha Home Baxi HVAC" and install the integration.
+3.  Restart Home Assistant.
+
+### Manual Installation
+
+1.  Ensure the `custom_components` folder exists in your Home Assistant configuration directory.
+2.  Copy the `custom_components/remeha_home` folder from this repository into your `custom_components` directory.
+3.  Restart Home Assistant.
 
 ## Setup
-1. In Home Assitant click on `Configuration`
-1. Click on `Devices & Services`
-1. Click on `+ Add integration`
-1. Search for and select `Remeha Home`
-1. Enter your email address and password
-1. Click "Next"
-1. Enjoy
+
+1.  In Home Assistant, go to `Settings` > `Devices & Services`.
+2.  Click `+ Add Integration`.
+3.  Search for and select `Remeha Home`.
+4.  Enter the email address and password you use for your Remeha/Baxi/etc. mobile app.
+5.  Click "Submit".
+6.  The integration will discover your devices and add the corresponding entities.
+
+## Known Issues / Future Work
+
+*   The underlying API interactions are complex and not fully documented publicly.
+*   Error handling for API edge cases could potentially be improved.
+*   No automated tests are included in this fork.
+*   Minor tweaks to the water heater entity might still be desired.
+
+## Acknowledgements
+
+*   Based on the work of **msvisser** ([msvisser/remeha_home](https://github.com/msvisser/remeha_home)).
