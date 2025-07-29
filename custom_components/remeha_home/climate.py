@@ -129,25 +129,35 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         """Return the maximum temperature."""
         return self._data["setPointMax"]
 
+# In climate.py, inside the RemehaHomeClimateEntity class
+
     @property
     def hvac_mode(self) -> HVACMode | str | None:
-        """Return the current HVAC mode.
-
-        If an override is set (from a recent change), return it. Otherwise, first try to pull
-        the operating mode from the zone data; if missing, fall back to the appliance data.
-        """
+        """Return the current HVAC mode."""
         # Use the override if available
         if self._requested_hvac_mode is not None:
             return self._requested_hvac_mode
 
         zone_data = self._data
-        operating_mode = zone_data.get("operatingMode")
-        if operating_mode is None:
-            # Fallback to the appliance's operating mode
-            appliance_data = self.coordinator.get_by_id(self.appliance_id)
-            operating_mode = appliance_data.get("operatingMode")
+
+        # --- START OF DEFINITIVE FIX ---
+        # The true mode of the zone is reported in the 'zoneMode' field.
+        # If it's 'FrostProtection', the zone is OFF, regardless of what the
+        # overall appliance operatingMode is.
+        if zone_data.get("zoneMode") == "FrostProtection":
+            return HVACMode.OFF
+        # --- END OF DEFINITIVE FIX ---
+
+        # If the zone is not in FrostProtection, then determine whether it should be
+        # heating or cooling by looking at the main appliance's operatingMode.
+        appliance_data = self.coordinator.get_by_id(self.appliance_id)
+        operating_mode = appliance_data.get("operatingMode")
+
+        # If for some reason the operating mode isn't available, default to OFF.
         if operating_mode is None:
             return HVACMode.OFF
+
+        # Use the existing mapping for HEAT/COOL modes.
         return OPERATING_MODE_TO_HVAC_MODE.get(operating_mode, HVACMode.OFF)
 
     @property
