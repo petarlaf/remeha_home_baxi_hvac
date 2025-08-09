@@ -84,6 +84,12 @@ APPLIANCE_SENSOR_TYPES = [
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
+    SensorEntityDescription(
+        key="errorStatus",
+        name="Error Status",
+        icon="mdi:alert-circle",
+        entity_registry_enabled_default=True,
+    ),
 ]
 
 CLIMATE_ZONE_SENSOR_TYPES = [
