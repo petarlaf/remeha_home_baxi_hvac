@@ -100,7 +100,21 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
             )
 
         return value
-
+        
+    @property
+    def icon(self) -> str | None:
+        """Return a dynamic icon for the error status sensor."""
+        # Check if this sensor is our new error status sensor
+        if self.entity_description.key == "errorStatus":
+            status = self.native_value
+            # If the status indicates a problem, show an alert icon
+            if status and status.lower() not in ["idle", "ok", "noerror"]:
+                return "mdi:alert-circle-outline"
+            # Otherwise, show a confirmation icon
+            return "mdi:check-circle"
+        # For all other sensors, use the icon defined in const.py (or default)
+        return self.entity_description.icon
+    
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info for this device."""
