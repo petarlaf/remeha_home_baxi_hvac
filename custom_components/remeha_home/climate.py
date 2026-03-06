@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import RemehaHomeConfigEntry
 from .api import RemehaHomeAPI
+from .const import DOMAIN
 from .coordinator import RemehaHomeUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,6 +98,7 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
         self._attr_unique_id = "_".join([DOMAIN, self.climate_zone_id])
         self._requested_hvac_mode: HVACMode | None = None
+        self._requested_hvac_mode_polls: int = 0
 
     @property
     def _data(self) -> dict:
@@ -216,9 +218,11 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
             mode_payload = HVAC_MODE_TO_OPERATING_MODE[hvac_mode]
             await self.api.async_set_operating_mode(self.appliance_id, mode_payload)
             self._requested_hvac_mode = hvac_mode
+            self._requested_hvac_mode_polls = 0
         elif hvac_mode == HVACMode.OFF:
             await self.api.async_set_off(self.climate_zone_id)
             self._requested_hvac_mode = HVACMode.OFF
+            self._requested_hvac_mode_polls = 0
         else:
             raise NotImplementedError(f"Unsupported HVAC mode: {hvac_mode}")
 
@@ -247,11 +251,14 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
         await self.coordinator.async_request_refresh()
 
+    # Number of coordinator polls to wait before giving up on the optimistic override
+    _OPTIMISTIC_MODE_TIMEOUT_POLLS = 3
+
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator.
 
-        Once new data is fetched, clear the optimistic HVAC mode override if
-        the appliance's reported state now matches what was requested.
+        Clear the optimistic HVAC mode override once the API confirms the new
+        state, or after _OPTIMISTIC_MODE_TIMEOUT_POLLS updates if it never does.
         """
         if self._requested_hvac_mode is not None:
             zone_data = self._data
@@ -267,5 +274,16 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
             if actual_mode == self._requested_hvac_mode:
                 self._requested_hvac_mode = None
+                self._requested_hvac_mode_polls = 0
+            else:
+                self._requested_hvac_mode_polls += 1
+                if self._requested_hvac_mode_polls >= self._OPTIMISTIC_MODE_TIMEOUT_POLLS:
+                    _LOGGER.warning(
+                        "Optimistic HVAC mode %s was not confirmed by the API after %d polls; reverting",
+                        self._requested_hvac_mode,
+                        self._requested_hvac_mode_polls,
+                    )
+                    self._requested_hvac_mode = None
+                    self._requested_hvac_mode_polls = 0
 
         super()._handle_coordinator_update()
