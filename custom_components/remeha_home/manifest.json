@@ -2,12 +2,12 @@
   "domain": "remeha_home",
   "name": "Remeha Home",
   "codeowners": [
-    "@msvisser"
+    "@petarlaf"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/msvisser/remeha_home",
+  "documentation": "https://github.com/petarlaf/remeha_home_baxi_hvac",
   "integration_type": "device",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/msvisser/remeha_home/issues",
-  "version": "0.0.0"
+  "issue_tracker": "https://github.com/petarlaf/remeha_home_baxi_hvac/issues",
+  "version": "1.0.0"
 }

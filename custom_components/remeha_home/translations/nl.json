@@ -1,7 +1,8 @@
 {
     "config": {
         "abort": {
-            "failed_to_authenticate": "Authentificeren mislukt"
+            "failed_to_authenticate": "Authentificeren mislukt",
+            "reauth_successful": "Herverificatie was succesvol"
         },
         "error": {
             "failed_to_authenticate": "Verkeerd e-mailadres en/of wachtwoord"
@@ -12,6 +13,9 @@
                     "email": "E-mailadres",
                     "password": "Wachtwoord"
                 }
+            },
+            "reauth_confirm": {
+                "description": "Het vernieuwen van het Remeha Home toegangstoken is mislukt. Verifieer opnieuw om door te gaan."
             }
         }
     },
@@ -21,11 +25,10 @@
                 "state_attributes": {
                     "preset_mode": {
                         "state": {
-                            "clock_program_1": "Klokprogramma 1",
-                            "clock_program_2": "Klokprogramma 2",
-                            "clock_program_3": "Klokprogramma 3",
-                            "anti_frost": "Vorst bescherming",
-                            "manual": "Handmatig"
+                            "manual": "Handmatig",
+                            "schedule1": "Klokprogramma 1",
+                            "schedule2": "Klokprogramma 2",
+                            "schedule3": "Klokprogramma 3"
                         }
                     }
                 }

@@ -1,5 +1,6 @@
 """API for Remeha Home bound to Home Assistant OAuth."""
 
+import asyncio
 import base64
 import datetime
 import hashlib
@@ -8,16 +9,16 @@ import logging
 import secrets
 import urllib
 
-import asyncio
 from aiohttp import ClientSession
 
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.config_entry_oauth2_flow import (
     AbstractOAuth2Implementation,
     OAuth2Session,
 )
-from homeassistant.exceptions import ConfigEntryAuthFailed
+import homeassistant.util.dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, API_SUBSCRIPTION_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class RemehaHomeAPI:
             **kwargs,
             headers={
                 **headers,
-                "Ocp-Apim-Subscription-Key": "df605c5470d846fc91e848b1cc653ddf",
+                "Ocp-Apim-Subscription-Key": API_SUBSCRIPTION_KEY,
             },
         )
 
@@ -111,10 +112,19 @@ class RemehaHomeAPI:
         )
         response.raise_for_status()
 
+    async def async_set_fireplace_mode(self, climate_zone_id: str, active: bool) -> None:
+        """Enable or disable fireplace mode for a climate zone."""
+        response = await self._async_api_request(
+            "POST",
+            f"/climate-zones/{climate_zone_id}/modes/fireplacemode",
+            json={"fireplaceModeActive": active},
+        )
+        response.raise_for_status()
+
     async def async_get_dashboard(self) -> dict:
         """Return the Remeha Home dashboard JSON."""
         # Add a timestamp to the request to prevent caching
-        timestamp = int(datetime.datetime.now().timestamp())
+        timestamp = int(dt_util.now().timestamp())
         response = await self._async_api_request(
             "GET", f"/homes/dashboard?t={timestamp}"
         )
@@ -134,9 +144,7 @@ class RemehaHomeAPI:
 
     async def async_get_consumption_data_for_today(self, appliance_id: str) -> dict:
         """Get consumption data for an appliance for today."""
-        today = datetime.datetime.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        today = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_today = today + datetime.timedelta(hours=23, minutes=59, seconds=59)
 
         today_string = today.strftime("%Y-%m-%d %H:%M:%S.%fZ")
@@ -166,10 +174,7 @@ class RemehaHomeAPI:
             raise
 
     async def async_set_hot_water_schedule(self, hot_water_zone_id: str) -> None:
-        """Activate Scheduled mode for a given hot water zone.
-
-        This sets the zone's mode to scheduled using the appropriate endpoint.
-        """
+        """Activate Scheduled mode for a given hot water zone."""
         response = await self._async_api_request(
             "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/schedule"
         )
@@ -196,24 +201,20 @@ class RemehaHomeAPI:
         response.raise_for_status()
 
     async def async_set_hot_water_comfort_setpoint(self, hot_water_zone_id: str, temperature: float) -> None:
-        """Set a new comfort setpoint temperature for a hot water zone.
-
-        This sends a payload with {"comfortSetpoint": <temperature>}.
-        """
-        payload = {"comfortSetpoint": temperature}
+        """Set a new comfort setpoint temperature for a hot water zone."""
         response = await self._async_api_request(
-            "POST", f"/hot-water-zones/{hot_water_zone_id}/comfort-setpoint", json=payload
+            "POST",
+            f"/hot-water-zones/{hot_water_zone_id}/comfort-setpoint",
+            json={"comfortSetpoint": temperature},
         )
         response.raise_for_status()
 
     async def async_set_hot_water_reduced_setpoint(self, hot_water_zone_id: str, temperature: float) -> None:
-        """Set a new reduced (eco) setpoint temperature for a hot water zone.
-
-        This sends a payload with {"reducedSetpoint": <temperature>}.
-        """
-        payload = {"reducedSetpoint": temperature}
+        """Set a new reduced (eco) setpoint temperature for a hot water zone."""
         response = await self._async_api_request(
-            "POST", f"/hot-water-zones/{hot_water_zone_id}/reduced-setpoint", json=payload
+            "POST",
+            f"/hot-water-zones/{hot_water_zone_id}/reduced-setpoint",
+            json={"reducedSetpoint": temperature},
         )
         response.raise_for_status()
 
@@ -359,7 +360,7 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
         return ""
 
     async def _async_request_new_token(self, grant_params):
-        """Call the OAuth2 token endpoint with specific grant paramters."""
+        """Call the OAuth2 token endpoint with specific grant parameters."""
         async with asyncio.timeout(30), self._session.post(
             "https://remehalogin.bdrthermea.net/bdrb2cprod.onmicrosoft.com/oauth2/v2.0/token?p=B2C_1A_RPSignUpSignInNewRoomV3.1",
             data=grant_params,
@@ -367,7 +368,7 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
         ) as response:
             # NOTE: The OAuth2 token request sometimes returns a "400 Bad Request" response. The root cause of this
             #       problem has not been found, but this workaround allows you to reauthenticate at least. Otherwise
-            #       Home Assitant would get stuck on refreshing the token forever.
+            #       Home Assistant would get stuck on refreshing the token forever.
             if response.status == 400:
                 response_json = await response.json()
                 _LOGGER.error(
