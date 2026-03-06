@@ -10,15 +10,14 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_HALVES, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import RemehaHomeConfigEntry
 from .api import RemehaHomeAPI
-from .const import DOMAIN
 from .coordinator import RemehaHomeUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,12 +47,12 @@ REMEHA_STATUS_TO_HVAC_ACTION = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: RemehaHomeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Remeha Home climate entity from a config entry."""
-    api: RemehaHomeAPI = hass.data[DOMAIN][entry.entry_id]["api"]
-    coordinator: RemehaHomeUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    api: RemehaHomeAPI = entry.runtime_data.api
+    coordinator: RemehaHomeUpdateCoordinator = entry.runtime_data.coordinator
 
     entities = []
     for appliance in coordinator.data["appliances"]:
@@ -238,6 +237,9 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
             return
 
         if preset_mode == "manual":
+            if self.target_temperature is None:
+                _LOGGER.warning("Cannot set manual preset: target temperature is unavailable")
+                return
             await self.api.async_set_manual(self.climate_zone_id, self.target_temperature)
         else:
             heating_program = int(preset_mode[-1])

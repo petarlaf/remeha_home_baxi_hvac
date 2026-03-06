@@ -18,7 +18,7 @@ from homeassistant.helpers.config_entry_oauth2_flow import (
 )
 import homeassistant.util.dt as dt_util
 
-from .const import DOMAIN, API_SUBSCRIPTION_KEY
+from .const import API_BASE_URL, API_SUBSCRIPTION_KEY, DOMAIN, OAUTH2_CLIENT_ID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class RemehaHomeAPI:
         headers = kwargs.pop("headers", {})
         return await self._oauth_session.async_request(
             method,
-            "https://api.bdrthermea.net/Mobile/api" + path,
+            API_BASE_URL + path,
             **kwargs,
             headers={
                 **headers,
@@ -163,15 +163,10 @@ class RemehaHomeAPI:
         Boost mode boosts the hot water to the comfort target set point for 30 minutes.
         Note: This mode can only be activated when the hot water zone is in Scheduled mode.
         """
-        try:
-            response = await self._async_api_request(
-                "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/boost"
-            )
-            response.raise_for_status()
-            _LOGGER.debug("Successfully activated Boost mode for hot water zone %s", hot_water_zone_id)
-        except Exception as err:
-            _LOGGER.error("Failed to activate Boost mode for hot water zone %s: %s", hot_water_zone_id, err)
-            raise
+        response = await self._async_api_request(
+            "POST", f"/hot-water-zones/{hot_water_zone_id}/modes/boost"
+        )
+        response.raise_for_status()
 
     async def async_set_hot_water_schedule(self, hot_water_zone_id: str) -> None:
         """Activate Scheduled mode for a given hot water zone."""
@@ -262,7 +257,7 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
                 "https://remehalogin.bdrthermea.net/bdrb2cprod.onmicrosoft.com/oauth2/v2.0/authorize",
                 params={
                     "response_type": "code",
-                    "client_id": "6ce007c6-0628-419e-88f4-bee2e6418eec",
+                    "client_id": OAUTH2_CLIENT_ID,
                     "redirect_uri": "com.b2c.remehaapp://login-callback",
                     "scope": "openid https://bdrb2cprod.onmicrosoft.com/iotdevice/user_impersonation offline_access",
                     "state": random_state,
@@ -332,9 +327,10 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
             response.raise_for_status()
 
             # Parse the callback url for the authorization code
+            # parse_qs returns lists, so extract the first element
             parsed_callback_url = urllib.parse.urlparse(response.headers["location"])
             query_string_dict = urllib.parse.parse_qs(parsed_callback_url.query)
-            authorization_code = query_string_dict["code"]
+            authorization_code = query_string_dict["code"][0]
 
             # Request a new token with the authorization code
             grant_params = {
@@ -342,7 +338,7 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
                 "code": authorization_code,
                 "redirect_uri": "com.b2c.remehaapp://login-callback",
                 "code_verifier": code_challenge,
-                "client_id": "6ce007c6-0628-419e-88f4-bee2e6418eec",
+                "client_id": OAUTH2_CLIENT_ID,
             }
             return await self._async_request_new_token(grant_params)
 
@@ -351,7 +347,7 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
         grant_params = {
             "grant_type": "refresh_token",
             "refresh_token": token["refresh_token"],
-            "client_id": "6ce007c6-0628-419e-88f4-bee2e6418eec",
+            "client_id": OAUTH2_CLIENT_ID,
         }
         return await self._async_request_new_token(grant_params)
 

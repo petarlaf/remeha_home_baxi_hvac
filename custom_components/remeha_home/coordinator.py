@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 import homeassistant.util.dt as dt_util
 
 from .api import RemehaHomeAPI
-from .const import DOMAIN
+from .const import DEFAULT_CONSUMPTION_DATA, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,18 +63,30 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
             appliance_id = appliance["applianceId"]
             self.items[appliance_id] = appliance
 
-            # Request appliance technical information the first time it is discovered
+            # Request appliance technical information the first time it is discovered.
+            # Wrapped in try/except so a transient error here doesn't discard dashboard data.
             if appliance_id not in self.technical_info:
-                self.technical_info[appliance_id] = (
-                    await self.api.async_get_appliance_technical_information(
-                        appliance_id
+                try:
+                    self.technical_info[appliance_id] = (
+                        await self.api.async_get_appliance_technical_information(
+                            appliance_id
+                        )
                     )
-                )
-                _LOGGER.debug(
-                    "Requested technical information for appliance %s: %s",
-                    appliance_id,
-                    self.technical_info[appliance_id],
-                )
+                    _LOGGER.debug(
+                        "Requested technical information for appliance %s: %s",
+                        appliance_id,
+                        self.technical_info[appliance_id],
+                    )
+                except ClientResponseError as err:
+                    _LOGGER.warning(
+                        "Failed to request technical information for appliance %s: %s",
+                        appliance_id,
+                        err,
+                    )
+                    self.technical_info[appliance_id] = {
+                        "applianceName": "Unknown",
+                        "internetConnectedGateways": [],
+                    }
 
             # Only update appliance usage data every 15 minutes
             if (appliance_id not in self.appliance_last_consumption_data_update) or (
@@ -101,14 +113,7 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                         _LOGGER.warning(
                             "No consumption data found for appliance %s", appliance_id
                         )
-                        self.appliance_consumption_data[appliance_id] = {
-                            "heatingEnergyConsumed": 0.0,
-                            "hotWaterEnergyConsumed": 0.0,
-                            "coolingEnergyConsumed": 0.0,
-                            "heatingEnergyDelivered": 0.0,
-                            "hotWaterEnergyDelivered": 0.0,
-                            "coolingEnergyDelivered": 0.0,
-                        }
+                        self.appliance_consumption_data[appliance_id] = DEFAULT_CONSUMPTION_DATA
 
                     self.appliance_last_consumption_data_update[appliance_id] = now
                 except ClientResponseError as err:
@@ -119,19 +124,9 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                     )
 
             # Get the cached consumption data for the appliance or use default values
-            if appliance_id in self.appliance_consumption_data:
-                appliance["consumptionData"] = self.appliance_consumption_data[
-                    appliance_id
-                ]
-            else:
-                appliance["consumptionData"] = {
-                    "heatingEnergyConsumed": 0.0,
-                    "hotWaterEnergyConsumed": 0.0,
-                    "coolingEnergyConsumed": 0.0,
-                    "heatingEnergyDelivered": 0.0,
-                    "hotWaterEnergyDelivered": 0.0,
-                    "coolingEnergyDelivered": 0.0,
-                }
+            appliance["consumptionData"] = self.appliance_consumption_data.get(
+                appliance_id, DEFAULT_CONSUMPTION_DATA
+            )
 
             self.device_info[appliance_id] = DeviceInfo(
                 identifiers={(DOMAIN, appliance_id)},
@@ -140,32 +135,30 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                 model=self.technical_info[appliance_id]["applianceName"],
             )
 
+            # Resolve gateway info once per appliance (shared by all climate zones)
+            gateways = self.technical_info[appliance_id].get(
+                "internetConnectedGateways", []
+            )
+            if len(gateways) > 1:
+                _LOGGER.warning(
+                    "Appliance %s has more than one gateway, using technical information from the first one",
+                    appliance_id,
+                )
+            if len(gateways) > 0:
+                gateway_info = gateways[0]
+            else:
+                _LOGGER.warning(
+                    "Appliance %s has no gateways, using unknown values",
+                    appliance_id,
+                )
+                gateway_info = {
+                    "name": "Unknown",
+                    "hardwareVersion": "Unknown",
+                    "softwareVersion": "Unknown",
+                }
+
             for climate_zone in appliance["climateZones"]:
                 climate_zone_id = climate_zone["climateZoneId"]
-                # This assumes that all climate zones for an appliance share the same gateway
-                gateways = self.technical_info[appliance_id][
-                    "internetConnectedGateways"
-                ]
-
-                if len(gateways) > 1:
-                    _LOGGER.warning(
-                        "Appliance %s has more than one gateway, using technical information from the first one",
-                        appliance_id,
-                    )
-
-                if len(gateways) > 0:
-                    gateway_info = gateways[0]
-                else:
-                    _LOGGER.warning(
-                        "Appliance %s has no gateways, using unknown values",
-                        appliance_id,
-                    )
-                    gateway_info = {
-                        "name": "Unknown",
-                        "hardwareVersion": "Unknown",
-                        "softwareVersion": "Unknown",
-                    }
-
                 self.items[climate_zone_id] = climate_zone
                 self.device_info[climate_zone_id] = DeviceInfo(
                     identifiers={(DOMAIN, climate_zone_id)},

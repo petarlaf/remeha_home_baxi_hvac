@@ -15,29 +15,28 @@ from homeassistant.components.water_heater import (
     WaterHeaterEntity,
     WaterHeaterEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 import homeassistant.util.dt as dt_util
 
-from .const import DOMAIN
-from .coordinator import RemehaHomeUpdateCoordinator
+from . import RemehaHomeConfigEntry
 from .api import RemehaHomeAPI
+from .coordinator import RemehaHomeUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: RemehaHomeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up water heater entities for the Remeha Home integration."""
-    coordinator: RemehaHomeUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    api: RemehaHomeAPI = hass.data[DOMAIN][entry.entry_id]["api"]
+    coordinator: RemehaHomeUpdateCoordinator = entry.runtime_data.coordinator
+    api: RemehaHomeAPI = entry.runtime_data.api
 
     entities = []
     for appliance in coordinator.data["appliances"]:
@@ -61,6 +60,7 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     """
 
     # Support target temperature and operation mode control.
+    _attr_has_entity_name = True
     _attr_supported_features = (
         WaterHeaterEntityFeature.TARGET_TEMPERATURE
         | WaterHeaterEntityFeature.OPERATION_MODE
@@ -182,7 +182,7 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
         Only available in Comfort or Eco mode.
         """
-        temperature = kwargs.get("temperature")
+        temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is None:
             return
 

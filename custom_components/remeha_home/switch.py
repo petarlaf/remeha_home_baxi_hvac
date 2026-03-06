@@ -3,31 +3,28 @@
 from __future__ import annotations
 import logging
 
-
 from homeassistant.components.switch import (
-    SwitchDeviceClass,
     SwitchEntity,
     SwitchEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import RemehaHomeConfigEntry
 from .api import RemehaHomeAPI
-from .const import DOMAIN
 from .coordinator import RemehaHomeUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: RemehaHomeConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Remeha Home switch entities from a config entry."""
-    api = hass.data[DOMAIN][entry.entry_id]["api"]
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    api = entry.runtime_data.api
+    coordinator = entry.runtime_data.coordinator
 
     entities = []
     for appliance in coordinator.data["appliances"]:
@@ -71,7 +68,7 @@ class RemehaHomeSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return the state of this switch."""
-        return self._data[self.entity_description.key]
+        return self._data.get(self.entity_description.key, False)
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -96,7 +93,6 @@ class RemehaHomeFireplaceModeSwitch(RemehaHomeSwitch):
             SwitchEntityDescription(
                 key="firePlaceModeActive",
                 name="Fireplace Mode",
-                device_class=SwitchDeviceClass.SWITCH,
             ),
         )
 

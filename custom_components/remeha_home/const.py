@@ -16,6 +16,22 @@ DOMAIN = "remeha_home"
 # Shared API subscription key (public key embedded in the official app)
 API_SUBSCRIPTION_KEY = "df605c5470d846fc91e848b1cc653ddf"
 
+# OAuth2 client ID for the Remeha B2C app
+OAUTH2_CLIENT_ID = "6ce007c6-0628-419e-88f4-bee2e6418eec"
+
+# Base URL for the BDR Thermea Mobile API
+API_BASE_URL = "https://api.bdrthermea.net/Mobile/api"
+
+# Default consumption data returned when the API has no data for today
+DEFAULT_CONSUMPTION_DATA: dict = {
+    "heatingEnergyConsumed": 0.0,
+    "hotWaterEnergyConsumed": 0.0,
+    "coolingEnergyConsumed": 0.0,
+    "heatingEnergyDelivered": 0.0,
+    "hotWaterEnergyDelivered": 0.0,
+    "coolingEnergyDelivered": 0.0,
+}
+
 APPLIANCE_SENSOR_TYPES = [
     SensorEntityDescription(
         key="waterPressure",

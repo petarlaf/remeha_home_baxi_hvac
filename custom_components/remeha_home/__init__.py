@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -22,10 +24,19 @@ PLATFORMS: list[Platform] = [
 ]
 
 
+@dataclass
+class RemehaHomeData:
+    """Runtime data stored on the config entry."""
+
+    api: RemehaHomeAPI
+    coordinator: RemehaHomeUpdateCoordinator
+
+
+RemehaHomeConfigEntry = ConfigEntry[RemehaHomeData]
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up Remeha Home."""
-    hass.data.setdefault(DOMAIN, {})
-
     RemehaHomeLoginFlowHandler.async_register_implementation(
         hass,
         RemehaHomeOAuth2Implementation(async_get_clientsession(hass)),
@@ -34,7 +45,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_setup_entry(hass: HomeAssistant, entry: RemehaHomeConfigEntry) -> bool:
     """Set up Remeha Home from a config entry."""
     implementation = (
         await config_entry_oauth2_flow.async_get_config_entry_implementation(
@@ -48,19 +59,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data[DOMAIN][entry.entry_id] = {
-        "api": api,
-        "coordinator": coordinator,
-    }
+    entry.runtime_data = RemehaHomeData(api=api, coordinator=coordinator)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: RemehaHomeConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
-
-    return unload_ok
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
