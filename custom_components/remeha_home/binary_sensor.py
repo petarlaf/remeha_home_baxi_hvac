@@ -8,14 +8,13 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import RemehaHomeConfigEntry
 from .const import (
-    DOMAIN,
     CLIMATE_ZONE_BINARY_SENSOR_TYPES,
     HOT_WATER_ZONE_BINARY_SENSOR_TYPES,
 )
@@ -25,10 +24,10 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: RemehaHomeConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Remeha Home binary sensor entities from a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data.coordinator
 
     entities = []
     for appliance in coordinator.data["appliances"]:

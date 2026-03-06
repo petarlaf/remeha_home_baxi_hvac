@@ -8,17 +8,16 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 import homeassistant.util.dt as dt_util
 
+from . import RemehaHomeConfigEntry
 from .const import (
     APPLIANCE_SENSOR_TYPES,
     CLIMATE_ZONE_SENSOR_TYPES,
-    DOMAIN,
     HOT_WATER_ZONE_SENSOR_TYPES,
 )
 from .coordinator import RemehaHomeUpdateCoordinator
@@ -27,10 +26,10 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: RemehaHomeConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Remeha Home sensor entities from a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator = entry.runtime_data.coordinator
 
     entities = []
     for appliance in coordinator.data["appliances"]:
@@ -83,14 +82,14 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
     def native_value(self):
         """Return the measurement value for this sensor."""
         data = self._data
-        for part in self.entity_description.key.split("."):
-            # If the key is missing for some reason, don't crash — return None
-            if part not in data:
-                _LOGGER.warning(
-                    "Key not found in data: %s", self.entity_description.key
-                )
-                return None
-            data = data[part]
+        if data is None:
+            return None
+        try:
+            for part in self.entity_description.key.split("."):
+                data = data[part]
+        except (KeyError, TypeError):
+            _LOGGER.warning("Key not found in data: %s", self.entity_description.key)
+            return None
         value = data
 
         if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
@@ -105,7 +104,8 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
                     self.entity_description.key,
                 )
                 return None
-            return parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+            # as_local() correctly converts a UTC-aware datetime to local time
+            return dt_util.as_local(parsed)
 
         return value
 
