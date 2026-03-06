@@ -1,17 +1,16 @@
 """Config flow for Remeha Home."""
 
-from typing import Any
 import logging
+from typing import Any, Mapping
 
 import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.config_entry_oauth2_flow import AbstractOAuth2FlowHandler
 
 from .const import DOMAIN
-from .api import RemehaHomeAuthFailed, RemehaHomeOAuth2Implementation
+from .api import RemehaHomeAuthFailed
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,16 +24,15 @@ class RemehaHomeLoginFlowHandler(AbstractOAuth2FlowHandler, domain=DOMAIN):
     def __init__(self):
         """Create a Remeha Home login flow."""
         super().__init__()
-        self.flow_impl: RemehaHomeOAuth2Implementation = None  # type: ignore
 
     @property
     def logger(self) -> logging.Logger:
         """Return logger."""
         return _LOGGER
 
-    async def async_step_reauth(self, user_input=None):
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> dict[str, Any]:
         """Perform reauth upon an API authentication error."""
-        _LOGGER.debug("reauth %s", user_input)
+        _LOGGER.debug("reauth triggered")
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(self, user_input=None):
@@ -50,12 +48,8 @@ class RemehaHomeLoginFlowHandler(AbstractOAuth2FlowHandler, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         """Handle a flow start."""
         await self.async_set_unique_id(DOMAIN)
-
-        self.async_register_implementation(
-            self.hass,
-            RemehaHomeOAuth2Implementation(async_get_clientsession(self.hass)),
-        )
-
+        # The OAuth2 implementation is registered once in __init__.py's async_setup.
+        # We do not re-register it here to avoid duplicate registrations on reauth.
         return await super().async_step_user(user_input)
 
     async def async_step_auth(self, user_input=None) -> dict[str, Any]:

@@ -1,15 +1,16 @@
 """Coordinator for fetching the Remeha Home data."""
 
-from datetime import datetime, timedelta
-import logging
-
 import asyncio
+import logging
+from datetime import timedelta
+
 from aiohttp.client_exceptions import ClientResponseError
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.exceptions import ConfigEntryAuthFailed
+import homeassistant.util.dt as dt_util
 
 from .api import RemehaHomeAPI
 from .const import DOMAIN
@@ -55,8 +56,8 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
 
             raise UpdateFailed from err
 
-        # Save the current time for appliance usage data updates
-        now = datetime.now()
+        # Save the current time (timezone-aware) for appliance usage data updates
+        now = dt_util.now()
 
         for appliance in data["appliances"]:
             appliance_id = appliance["applianceId"]

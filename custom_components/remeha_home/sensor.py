@@ -3,7 +3,6 @@
 from __future__ import annotations
 import logging
 
-
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -85,7 +84,7 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
         """Return the measurement value for this sensor."""
         data = self._data
         for part in self.entity_description.key.split("."):
-            # If the key is missing for some reason, don't crash, instead return None
+            # If the key is missing for some reason, don't crash — return None
             if part not in data:
                 _LOGGER.warning(
                     "Key not found in data: %s", self.entity_description.key
@@ -95,26 +94,31 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
         value = data
 
         if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
-            return dt_util.parse_datetime(value).replace(
-                tzinfo=dt_util.DEFAULT_TIME_ZONE
-            )
+            # Guard against None values (e.g. boostModeEndTime when not in boost mode)
+            if value is None:
+                return None
+            parsed = dt_util.parse_datetime(value)
+            if parsed is None:
+                _LOGGER.warning(
+                    "Could not parse timestamp value '%s' for sensor %s",
+                    value,
+                    self.entity_description.key,
+                )
+                return None
+            return parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
 
         return value
-        
+
     @property
     def icon(self) -> str | None:
         """Return a dynamic icon for the error status sensor."""
-        # Check if this sensor is our new error status sensor
         if self.entity_description.key == "errorStatus":
             status = self.native_value
-            # If the status indicates a problem, show an alert icon
-            if status and status.lower() not in ["idle", "ok", "noerror"]:
+            if status and status.lower() not in ["idle", "ok", "noerror", "running"]:
                 return "mdi:alert-circle-outline"
-            # Otherwise, show a confirmation icon
             return "mdi:check-circle"
-        # For all other sensors, use the icon defined in const.py (or default)
         return self.entity_description.icon
-    
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info for this device."""

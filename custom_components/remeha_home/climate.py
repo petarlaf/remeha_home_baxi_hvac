@@ -1,8 +1,8 @@
 """Platform for Remeha Home climate integration."""
 
 from __future__ import annotations
-from typing import Any
 import logging
+from typing import Any
 
 from homeassistant.components.climate import (
     ClimateEntity,
@@ -23,7 +23,7 @@ from .coordinator import RemehaHomeUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# New mappings for operating mode and HVAC modes (we have removed FrostProtection)
+# Mappings for appliance operating mode ↔ HVAC mode
 OPERATING_MODE_TO_HVAC_MODE = {
     "AutomaticCoolingHeating": HVACMode.HEAT,
     "ForcedCooling": HVACMode.COOL,
@@ -38,12 +38,13 @@ HVAC_MODE_TO_OPERATING_MODE = {
 # Allowed preset modes
 ALLOWED_PRESET_MODES = ["manual", "schedule1", "schedule2", "schedule3"]
 
-# New mapping for HVAC action based on activeComfortDemand returned from the API.
+# HVAC action mapping based on activeComfortDemand returned from the API
 REMEHA_STATUS_TO_HVAC_ACTION = {
     "ProducingHeat": HVACAction.HEATING,
     "Idle": HVACAction.IDLE,
     "ProducingCold": HVACAction.COOLING,
 }
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -64,6 +65,7 @@ async def async_setup_entry(
             )
 
     async_add_entities(entities)
+
 
 class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
     """Climate entity representing a Remeha Home climate zone."""
@@ -129,35 +131,27 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         """Return the maximum temperature."""
         return self._data["setPointMax"]
 
-# In climate.py, inside the RemehaHomeClimateEntity class
-
     @property
     def hvac_mode(self) -> HVACMode | str | None:
         """Return the current HVAC mode."""
-        # Use the override if available
+        # Use the override if available (set optimistically after a user action)
         if self._requested_hvac_mode is not None:
             return self._requested_hvac_mode
 
         zone_data = self._data
 
-        # --- START OF DEFINITIVE FIX ---
-        # The true mode of the zone is reported in the 'zoneMode' field.
-        # If it's 'FrostProtection', the zone is OFF, regardless of what the
-        # overall appliance operatingMode is.
+        # The true mode of the zone is reported in 'zoneMode'.
+        # If it's 'FrostProtection', the zone is OFF regardless of appliance operatingMode.
         if zone_data.get("zoneMode") == "FrostProtection":
             return HVACMode.OFF
-        # --- END OF DEFINITIVE FIX ---
 
-        # If the zone is not in FrostProtection, then determine whether it should be
-        # heating or cooling by looking at the main appliance's operatingMode.
+        # If the zone is active, determine HEAT or COOL from the appliance's operatingMode.
         appliance_data = self.coordinator.get_by_id(self.appliance_id)
         operating_mode = appliance_data.get("operatingMode")
 
-        # If for some reason the operating mode isn't available, default to OFF.
         if operating_mode is None:
             return HVACMode.OFF
 
-        # Use the existing mapping for HEAT/COOL modes.
         return OPERATING_MODE_TO_HVAC_MODE.get(operating_mode, HVACMode.OFF)
 
     @property
@@ -167,18 +161,11 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
     @property
     def hvac_action(self) -> HVACAction | str | None:
-        """Return HVAC action based on the activeComfortDemand.
-
-        Uses the activeComfortDemand value which is returned from the API call
-        to https://api.bdrthermea.net/Mobile/api/homes/dashboard. The mapping is:
-          "ProducingHeat" -> HVACAction.HEATING
-          "Idle" -> HVACAction.IDLE
-          "ProducingCold" -> HVACAction.COOLING
-        """
+        """Return HVAC action based on the activeComfortDemand field from the API."""
         active_comfort = self._data.get("activeComfortDemand")
         if active_comfort in REMEHA_STATUS_TO_HVAC_ACTION:
             return REMEHA_STATUS_TO_HVAC_ACTION[active_comfort]
-        # Fallback logic:
+        # Fallback logic based on current mode
         if self.hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
         elif self.hvac_mode == HVACMode.HEAT:
@@ -191,8 +178,8 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
     def preset_mode(self) -> str | None:
         """Return the preset mode.
 
-        Mapping: if the zone is in manual mode then preset is 'manual'.
-        Otherwise if in schedule mode, then based on the active heating program number.
+        'manual' when the zone is in manual mode.
+        'schedule1/2/3' when in schedule mode, based on the active program number.
         """
         zone_mode = self._data.get("zoneMode")
         if self.hvac_mode == HVACMode.OFF:
@@ -212,10 +199,7 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         return ALLOWED_PRESET_MODES
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
-        """Set new target temperature.
-
-        When updating the temperature while in manual preset mode we call the manual API.
-        """
+        """Set new target temperature."""
         if (temperature := kwargs.get(ATTR_TEMPERATURE)) is not None:
             _LOGGER.debug("Setting temperature to %f", temperature)
             if self.hvac_mode != HVACMode.OFF:
@@ -226,7 +210,7 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         """Set new HVAC operating mode.
 
         For HEAT and COOL we use the operating mode API on the appliance.
-        For OFF we use the existing off API on the zone.
+        For OFF we use the anti-frost API on the zone.
         """
         _LOGGER.debug("Setting HVAC mode to %s", hvac_mode)
         if hvac_mode in (HVACMode.HEAT, HVACMode.COOL):
@@ -244,8 +228,8 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode.
 
-        For 'manual' we call the manual API (and pass the current target temperature).
-        For 'schedule1', 'schedule2' or 'schedule3' we call the schedule API specifying the corresponding heating program id.
+        'manual' calls the manual API with the current target temperature.
+        'schedule1/2/3' calls the schedule API with the corresponding program id.
         """
         _LOGGER.debug("Setting preset mode to %s", preset_mode)
         preset_mode = preset_mode.lower()
@@ -264,12 +248,22 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator.
 
-        Once new data is fetched we clear our temporary override if the actual state has changed.
+        Once new data is fetched, clear the optimistic HVAC mode override if
+        the appliance's reported state now matches what was requested.
         """
-        zone_data = self._data
-        operating_mode = zone_data.get("operatingMode")
-        if operating_mode is not None:
-            expected_mode = OPERATING_MODE_TO_HVAC_MODE.get(operating_mode, HVACMode.OFF)
-            if expected_mode != self._requested_hvac_mode:
+        if self._requested_hvac_mode is not None:
+            zone_data = self._data
+            appliance_data = self.coordinator.get_by_id(self.appliance_id)
+
+            # Check OFF state via zoneMode on the zone
+            if zone_data.get("zoneMode") == "FrostProtection":
+                actual_mode = HVACMode.OFF
+            else:
+                # For HEAT/COOL, read operatingMode from the appliance
+                operating_mode = appliance_data.get("operatingMode") if appliance_data else None
+                actual_mode = OPERATING_MODE_TO_HVAC_MODE.get(operating_mode, HVACMode.OFF)
+
+            if actual_mode == self._requested_hvac_mode:
                 self._requested_hvac_mode = None
+
         super()._handle_coordinator_update()

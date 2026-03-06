@@ -5,13 +5,6 @@ Based on the data provided by the dashboard API, the relevant fields are:
   - target temperature: "targetSetpoint"
   - min/max temperature: "setPointMin"/"setPointMax" (optional)
   - current operation mode: "dhwZoneMode" (e.g. Scheduling, Comfort, Eco, or Boost)
-
-To fully support control, ensure that the RemehaHomeAPI class implements:
-  - async_set_hot_water_temperature(hot_water_zone_id: str, temperature: float)
-  - async_set_hot_water_boost(hot_water_zone_id: str)
-  - async_set_hot_water_schedule(hot_water_zone_id: str)
-  - async_set_hot_water_comfort(hot_water_zone_id: str)
-  - async_set_hot_water_eco(hot_water_zone_id: str)
 """
 
 from __future__ import annotations
@@ -28,12 +21,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import RemehaHomeUpdateCoordinator
 from .api import RemehaHomeAPI
 
 _LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -45,7 +40,6 @@ async def async_setup_entry(
     api: RemehaHomeAPI = hass.data[DOMAIN][entry.entry_id]["api"]
 
     entities = []
-    # Loop through each appliance and hot water zone
     for appliance in coordinator.data["appliances"]:
         for hot_water_zone in appliance.get("hotWaterZones", []):
             hot_water_zone_id = hot_water_zone["hotWaterZoneId"]
@@ -53,6 +47,7 @@ async def async_setup_entry(
                 RemehaHomeWaterHeater(api, coordinator, hot_water_zone_id)
             )
     async_add_entities(entities)
+
 
 class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     """Representation of a Water Heater for a Remeha Home hot water zone.
@@ -65,12 +60,10 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     - Eco: Maintains water at reduced temperature (anti-frost).
     """
 
-    _attr_unit_of_measurement = UnitOfTemperature.CELSIUS
     # Support target temperature and operation mode control.
-    # Available modes: Boost (only when in Scheduled mode), Scheduled, Comfort, and Eco.
     _attr_supported_features = (
-        WaterHeaterEntityFeature.TARGET_TEMPERATURE |
-        WaterHeaterEntityFeature.OPERATION_MODE
+        WaterHeaterEntityFeature.TARGET_TEMPERATURE
+        | WaterHeaterEntityFeature.OPERATION_MODE
     )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
@@ -105,11 +98,9 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     def target_temperature(self) -> float | None:
         """Return the current target setpoint temperature depending on the active mode.
 
-        - For Scheduled mode, use "targetSetpoint" from the API.
-        - For Eco mode, use "reducedSetpoint".
-        - For Comfort mode, use "comfortSetPoint".
-        Temperature will be updated proactively by refreshing the dashboard API every time
-        the mode changes.
+        - Scheduled: use "targetSetpoint"
+        - Eco: use "reducedSetpoint"
+        - Comfort: use "comfortSetPoint"
         """
         current_mode = self.current_operation
         if current_mode == "Scheduled":
@@ -118,49 +109,33 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
             return self._data.get("reducedSetpoint")
         elif current_mode == "Comfort":
             return self._data.get("comfortSetPoint")
-        else:
-            # For modes where temperature adjustments aren't allowed, you might return None.
-            return None
+        return None
 
     @property
     def min_temp(self) -> float | None:
-        """Return the minimum temperature allowed for the water heater.
-
-        In Eco mode, use the reduced setpoint minimum (typically 10.0).
-        In Comfort mode, use the comfort setpoint minimum (typically 40.0).
-        For other modes, fallback to the default provided by the API.
-        """
+        """Return the minimum temperature allowed for the water heater."""
         current_mode = self.current_operation
         set_point_ranges = self._data.get("setPointRanges", {})
         if current_mode == "Eco":
             return set_point_ranges.get("reducedSetpointMin", self._data.get("setPointMin"))
         elif current_mode == "Comfort":
             return set_point_ranges.get("comfortSetpointMin", self._data.get("setPointMin"))
-        else:
-            # Fallback in modes that don't allow temperature changes.
-            return self._data.get("setPointMin")
+        return self._data.get("setPointMin")
 
     @property
     def max_temp(self) -> float | None:
-        """Return the maximum temperature allowed for the water heater.
-
-        In Eco mode, use the reduced setpoint maximum (typically 60.0).
-        In Comfort mode, use the comfort setpoint maximum (typically 65.0).
-        For other modes, fallback to the default provided by the API.
-        """
+        """Return the maximum temperature allowed for the water heater."""
         current_mode = self.current_operation
         set_point_ranges = self._data.get("setPointRanges", {})
         if current_mode == "Eco":
             return set_point_ranges.get("reducedSetpointMax", self._data.get("setPointMax"))
         elif current_mode == "Comfort":
             return set_point_ranges.get("comfortSetpointMax", self._data.get("setPointMax"))
-        else:
-            # Fallback in modes that don't allow temperature changes.
-            return self._data.get("setPointMax")
+        return self._data.get("setPointMax")
 
     @property
     def current_operation(self) -> str:
-        """Return the current operation mode (e.g. Scheduled, Comfort, Eco, or Boost)."""
+        """Return the current operation mode (Scheduled, Comfort, Eco, or Boost)."""
         raw_mode = self._data.get("dhwZoneMode", "Unknown")
         mode_mapping = {
             "continuouscomfort": "Comfort",
@@ -171,31 +146,23 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         return mode_mapping.get(raw_mode.lower(), raw_mode)
 
     @property
-    def extra_state_attributes(self) -> dict[str, any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes for the water heater entity."""
-        attributes = {}
+        attributes: dict[str, Any] = {}
 
         # Add remaining boost time if in boost mode
         if self.current_operation == "Boost":
             boost_end_time = self._data.get("boostModeEndTime")
             if boost_end_time:
                 try:
-                    # Parse the ISO format datetime string
-                    from datetime import datetime
-                    import pytz
-
-                    # Convert to datetime object
-                    end_time = datetime.fromisoformat(boost_end_time.replace('Z', '+00:00'))
-
-                    # Get current time in UTC
-                    now = datetime.now(pytz.UTC)
-
-                    # Calculate remaining time in minutes
-                    remaining_seconds = (end_time - now).total_seconds()
-                    if remaining_seconds > 0:
-                        remaining_minutes = int(remaining_seconds / 60)
-                        attributes["remaining_boost_time"] = f"{remaining_minutes} minutes"
-                except Exception as e:
+                    end_time = dt_util.parse_datetime(boost_end_time)
+                    if end_time is not None:
+                        now = dt_util.utcnow()
+                        remaining_seconds = (end_time - now).total_seconds()
+                        if remaining_seconds > 0:
+                            remaining_minutes = int(remaining_seconds / 60)
+                            attributes["remaining_boost_time"] = f"{remaining_minutes} minutes"
+                except Exception as e:  # noqa: BLE001
                     _LOGGER.warning("Error calculating remaining boost time: %s", e)
 
         return attributes
@@ -204,20 +171,16 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     def operation_list(self) -> list[str]:
         """Return the list of available operation modes.
 
-        Boost mode is only available when the current mode is Scheduled.
+        Boost is only available when the current mode is Scheduled.
         """
-        current_mode = self.current_operation
-        if current_mode == "Scheduled":
+        if self.current_operation == "Scheduled":
             return ["Boost", "Scheduled", "Comfort", "Eco"]
-        else:
-            return ["Scheduled", "Comfort", "Eco"]
+        return ["Scheduled", "Comfort", "Eco"]
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set a new target temperature for the water heater.
 
-        Temperature can only be changed when the water heater is in Comfort or Eco mode.
-        For Comfort mode, the API endpoint "/comfort-setpoint" is called with payload {"comfortSetpoint": temperature}.
-        For Eco mode, the API endpoint "/reduced-setpoint" is called with payload {"reducedSetpoint": temperature}.
+        Only available in Comfort or Eco mode.
         """
         temperature = kwargs.get("temperature")
         if temperature is None:
@@ -236,21 +199,16 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_set_operation_mode(self, operation_mode: str) -> None:
-        """Set a new operation mode for the water heater.
-
-        Depending on the mode selected, the corresponding API endpoint is called:
-          - Boost -> /modes/boost (only available when current mode is "Scheduled")
-          - Scheduled -> /modes/schedule
-          - Comfort -> /modes/continuous-comfort
-          - Eco -> /modes/anti-frost
-        """
+        """Set a new operation mode for the water heater."""
         _LOGGER.debug("Setting hot water operation mode to %s", operation_mode)
         op_mode = operation_mode.lower()
         if op_mode == "boost":
-            # Check if the current mode is "Scheduled" before allowing Boost mode
             current_mode = self.current_operation
             if current_mode != "Scheduled":
-                _LOGGER.warning("Boost mode can only be activated when in Scheduled mode. Current mode: %s", current_mode)
+                _LOGGER.warning(
+                    "Boost mode can only be activated when in Scheduled mode. Current mode: %s",
+                    current_mode,
+                )
                 return
             await self.api.async_set_hot_water_boost(self.hot_water_zone_id)
         elif op_mode == "scheduled":
@@ -262,4 +220,5 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         else:
             _LOGGER.error("Unknown hot water mode: %s", operation_mode)
             return
+
         await self.coordinator.async_request_refresh()

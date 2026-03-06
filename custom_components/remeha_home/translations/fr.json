@@ -1,7 +1,8 @@
 {
     "config": {
         "abort": {
-            "failed_to_authenticate": "Authentification interrompue"
+            "failed_to_authenticate": "Authentification interrompue",
+            "reauth_successful": "La ré-authentification a réussi"
         },
         "error": {
             "failed_to_authenticate": "Adresse email ou mot de passe invalide"
@@ -9,9 +10,12 @@
         "step": {
             "auth": {
                 "data": {
-                    "email": "Addresse e-mail",
+                    "email": "Adresse e-mail",
                     "password": "Mot de passe"
                 }
+            },
+            "reauth_confirm": {
+                "description": "Impossible de rafraîchir le jeton d'accès Remeha Home. Veuillez vous ré-authentifier pour continuer."
             }
         }
     },
@@ -21,11 +25,10 @@
                 "state_attributes": {
                     "preset_mode": {
                         "state": {
-                            "clock_program_1": "Programme 1",
-                            "clock_program_2": "Programme 2",
-                            "clock_program_3": "Programme 3",
-                            "anti_frost": "Hors-gel",
-                            "manual": "Manuel"
+                            "manual": "Manuel",
+                            "schedule1": "Programme 1",
+                            "schedule2": "Programme 2",
+                            "schedule3": "Programme 3"
                         }
                     }
                 }
