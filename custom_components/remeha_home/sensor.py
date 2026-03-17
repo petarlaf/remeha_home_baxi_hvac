@@ -105,7 +105,10 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
                     self.entity_description.key,
                 )
                 return None
-            return parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+            # Only add timezone if the parsed datetime is naive
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+            return parsed
 
         return value
 
