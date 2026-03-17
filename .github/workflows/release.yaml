@@ -16,7 +16,7 @@ jobs:
       contents: write
     steps:
       - name: "Checkout the repository"
-        uses: "actions/checkout@v4.1.0"
+        uses: "actions/checkout@v4"
 
       - name: "Adjust version number"
         shell: "bash"
@@ -31,6 +31,6 @@ jobs:
           zip remeha_home.zip -r ./
 
       - name: "Upload the ZIP file to the release"
-        uses: softprops/action-gh-release@v0.1.15
+        uses: softprops/action-gh-release@v2
         with:
           files: ${{ github.workspace }}/custom_components/remeha_home/remeha_home.zip
