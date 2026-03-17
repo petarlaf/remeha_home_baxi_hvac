@@ -1,11 +1,11 @@
 """Config flow for Remeha Home."""
 
 import logging
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 import voluptuous as vol
 
-from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.helpers.config_entry_oauth2_flow import AbstractOAuth2FlowHandler
 
@@ -19,11 +19,6 @@ class RemehaHomeLoginFlowHandler(AbstractOAuth2FlowHandler, domain=DOMAIN):
     """Config flow to handle RemehaHome authentication."""
 
     DOMAIN = DOMAIN
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
-
-    def __init__(self):
-        """Create a Remeha Home login flow."""
-        super().__init__()
 
     @property
     def logger(self) -> logging.Logger:
