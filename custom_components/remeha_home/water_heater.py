@@ -66,6 +66,8 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         | WaterHeaterEntityFeature.OPERATION_MODE
     )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_has_entity_name = True
+    _attr_name = None
 
     def __init__(
         self,

@@ -52,17 +52,21 @@ This integration aims to create the following entities based on your system's ca
     *   Controls: Operation Mode (Scheduled, Comfort, Eco, Boost), Target Temperature (in Comfort/Eco modes).
     *   Attributes: Remaining Boost Time (when active).
 *   **Sensors (`sensor.*`):**
-    *   Room Temperature
-    *   Outdoor Temperature (if available)
-    *   Water Pressure (if available)
-    *   Heating Energy Consumed/Delivered (Daily)
-    *   Hot Water Energy Consumed/Delivered (Daily)
-    *   Cooling Energy Consumed/Delivered (Daily)
-    *   Next Schedule Setpoint & Time (Climate)
+    *   Outdoor Temperature (Appliance, if available)
+    *   Cloud Outdoor Temperature (Appliance, disabled by default)
+    *   Water Pressure (Appliance, if available)
+    *   Heating Energy Consumed/Delivered (Appliance, Daily, disabled by default)
+    *   Hot Water Energy Consumed/Delivered (Appliance, Daily, disabled by default)
+    *   Cooling Energy Consumed/Delivered (Appliance, Daily, disabled by default)
+    *   Error Status (Appliance)
+    *   Next Schedule Setpoint & Time (Climate Zone)
+    *   Current Schedule Setpoint (Climate Zone)
+    *   Water Temperature (Hot Water Zone)
+    *   Hot Water Status (Hot Water Zone, disabled by default)
+    *   Boost Mode End Time (Hot Water Zone)
 *   **Binary Sensors (`binary_sensor.*`):**
-    *   Frost Protection Active (Climate)
-    *   Heating Status (Appliance)
-    *   Hot Water Status (Appliance)
+    *   Climate Zone Heating Status (based on comfort demand)
+    *   Hot Water Zone Heating Status
 *   **Switches (`switch.*`):**
     *   Fireplace Mode (Climate - if supported)
 
