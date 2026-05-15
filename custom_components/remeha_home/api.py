@@ -8,6 +8,7 @@ import json
 import logging
 import secrets
 import urllib
+from json import JSONDecodeError
 
 from aiohttp import ClientSession
 
@@ -314,7 +315,13 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
                 },
             )
             response.raise_for_status()
-            response_json = json.loads(await response.text())
+            try:
+                response_json = json.loads(await response.text())
+            except JSONDecodeError as err:
+                _LOGGER.warning(
+                    "Remeha Home authentication returned an unexpected non-JSON response"
+                )
+                raise RemehaHomeAuthFailed from err
             if response_json["status"] != "200":
                 raise RemehaHomeAuthFailed
 
@@ -370,14 +377,14 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
             #       problem has not been found, but this workaround allows you to reauthenticate at least. Otherwise
             #       Home Assistant would get stuck on refreshing the token forever.
             if response.status == 400:
-                response_json = await response.json()
+                response_json = await response.json(content_type=None)
                 _LOGGER.error(
                     "OAuth2 token request returned '400 Bad Request': %s",
-                    response_json["error_description"],
+                    response_json.get("error_description", response_json),
                 )
                 raise ConfigEntryAuthFailed
 
             response.raise_for_status()
-            response_json = await response.json()
+            response_json = await response.json(content_type=None)
 
         return response_json

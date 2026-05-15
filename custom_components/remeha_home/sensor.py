@@ -25,6 +25,8 @@ from .coordinator import RemehaHomeUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+SENTINEL_TIMESTAMP_YEARS = {1}
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -80,6 +82,11 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
         return self.coordinator.get_by_id(self.item_id)
 
     @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return super().available and self._data is not None
+
+    @property
     def native_value(self):
         """Return the measurement value for this sensor."""
         data = self._data
@@ -104,6 +111,8 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
                     value,
                     self.entity_description.key,
                 )
+                return None
+            if parsed.year in SENTINEL_TIMESTAMP_YEARS:
                 return None
             # Only add timezone if the parsed datetime is naive
             if parsed.tzinfo is None:
