@@ -16,6 +16,15 @@ DOMAIN = "remeha_home"
 # Shared API subscription key (public key embedded in the official app)
 API_SUBSCRIPTION_KEY = "df605c5470d846fc91e848b1cc653ddf"
 
+DEFAULT_CONSUMPTION_DATA = {
+    "heatingEnergyConsumed": None,
+    "hotWaterEnergyConsumed": None,
+    "coolingEnergyConsumed": None,
+    "heatingEnergyDelivered": None,
+    "hotWaterEnergyDelivered": None,
+    "coolingEnergyDelivered": None,
+}
+
 APPLIANCE_SENSOR_TYPES = [
     SensorEntityDescription(
         key="waterPressure",
@@ -45,9 +54,7 @@ APPLIANCE_SENSOR_TYPES = [
         entity_registry_enabled_default=False,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        # Daily values reset at midnight — MEASUREMENT is correct here.
-        # TOTAL_INCREASING would break the energy dashboard on reset.
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="consumptionData.hotWaterEnergyConsumed",
@@ -55,7 +62,7 @@ APPLIANCE_SENSOR_TYPES = [
         entity_registry_enabled_default=False,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="consumptionData.coolingEnergyConsumed",
@@ -63,7 +70,7 @@ APPLIANCE_SENSOR_TYPES = [
         entity_registry_enabled_default=False,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="consumptionData.heatingEnergyDelivered",
@@ -71,7 +78,7 @@ APPLIANCE_SENSOR_TYPES = [
         entity_registry_enabled_default=False,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="consumptionData.hotWaterEnergyDelivered",
@@ -79,7 +86,7 @@ APPLIANCE_SENSOR_TYPES = [
         entity_registry_enabled_default=False,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="consumptionData.coolingEnergyDelivered",
@@ -87,7 +94,7 @@ APPLIANCE_SENSOR_TYPES = [
         entity_registry_enabled_default=False,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="errorStatus",
