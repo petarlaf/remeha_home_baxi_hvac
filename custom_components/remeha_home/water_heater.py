@@ -8,6 +8,7 @@ Based on the data provided by the dashboard API, the relevant fields are:
 """
 
 from __future__ import annotations
+from datetime import UTC, datetime
 import logging
 from typing import Any
 
@@ -28,6 +29,8 @@ from .coordinator import RemehaHomeUpdateCoordinator
 from .api import RemehaHomeAPI
 
 _LOGGER = logging.getLogger(__name__)
+
+SENTINEL_TIMESTAMP_YEARS = {1}
 
 
 async def async_setup_entry(
@@ -87,6 +90,11 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         return self.coordinator.get_by_id(self.hot_water_zone_id)
 
     @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return super().available and self._data is not None
+
+    @property
     def device_info(self) -> DeviceInfo:
         """Return device information for the water heater."""
         return self.coordinator.get_device_info(self.hot_water_zone_id)
@@ -94,6 +102,8 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     @property
     def current_temperature(self) -> float | None:
         """Return the current water temperature."""
+        if self._data is None:
+            return None
         return self._data.get("dhwTemperature")
 
     @property
@@ -105,6 +115,8 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         - Comfort: use "comfortSetPoint"
         """
         current_mode = self.current_operation
+        if self._data is None:
+            return None
         if current_mode == "Scheduled":
             return self._data.get("targetSetpoint")
         elif current_mode == "Eco":
@@ -117,6 +129,8 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     def min_temp(self) -> float | None:
         """Return the minimum temperature allowed for the water heater."""
         current_mode = self.current_operation
+        if self._data is None:
+            return None
         set_point_ranges = self._data.get("setPointRanges", {})
         if current_mode == "Eco":
             return set_point_ranges.get("reducedSetpointMin", self._data.get("setPointMin"))
@@ -128,6 +142,8 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     def max_temp(self) -> float | None:
         """Return the maximum temperature allowed for the water heater."""
         current_mode = self.current_operation
+        if self._data is None:
+            return None
         set_point_ranges = self._data.get("setPointRanges", {})
         if current_mode == "Eco":
             return set_point_ranges.get("reducedSetpointMax", self._data.get("setPointMax"))
@@ -138,6 +154,8 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
     @property
     def current_operation(self) -> str:
         """Return the current operation mode (Scheduled, Comfort, Eco, or Boost)."""
+        if self._data is None:
+            return "Unknown"
         raw_mode = self._data.get("dhwZoneMode", "Unknown")
         mode_mapping = {
             "continuouscomfort": "Comfort",
@@ -158,8 +176,10 @@ class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
             if boost_end_time:
                 try:
                     end_time = dt_util.parse_datetime(boost_end_time)
-                    if end_time is not None:
-                        now = dt_util.utcnow()
+                    if end_time is not None and end_time.year not in SENTINEL_TIMESTAMP_YEARS:
+                        if end_time.tzinfo is None:
+                            end_time = end_time.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+                        now = datetime.now(UTC)
                         remaining_seconds = (end_time - now).total_seconds()
                         if remaining_seconds > 0:
                             remaining_minutes = int(remaining_seconds / 60)

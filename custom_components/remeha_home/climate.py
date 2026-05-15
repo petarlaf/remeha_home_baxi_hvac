@@ -105,6 +105,15 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         return self.coordinator.get_by_id(self.climate_zone_id)
 
     @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return (
+            super().available
+            and self._data is not None
+            and self.coordinator.get_by_id(self.appliance_id) is not None
+        )
+
+    @property
     def device_info(self) -> DeviceInfo:
         """Return device info for this device."""
         return self.coordinator.get_device_info(self.climate_zone_id)
@@ -112,24 +121,30 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         """Return the current temperature."""
-        return self._data["roomTemperature"]
+        if self._data is None:
+            return None
+        return self._data.get("roomTemperature")
 
     @property
     def target_temperature(self) -> float | None:
         """Return the target temperature."""
-        if self.hvac_mode == HVACMode.OFF:
+        if self._data is None or self.hvac_mode == HVACMode.OFF:
             return None
-        return self._data["setPoint"]
+        return self._data.get("setPoint")
 
     @property
-    def min_temp(self) -> float:
+    def min_temp(self) -> float | None:
         """Return the minimum temperature."""
-        return self._data["setPointMin"]
+        if self._data is None:
+            return None
+        return self._data.get("setPointMin")
 
     @property
-    def max_temp(self) -> float:
+    def max_temp(self) -> float | None:
         """Return the maximum temperature."""
-        return self._data["setPointMax"]
+        if self._data is None:
+            return None
+        return self._data.get("setPointMax")
 
     @property
     def hvac_mode(self) -> HVACMode | str | None:
@@ -139,6 +154,8 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
             return self._requested_hvac_mode
 
         zone_data = self._data
+        if zone_data is None:
+            return HVACMode.OFF
 
         # The true mode of the zone is reported in 'zoneMode'.
         # If it's 'FrostProtection', the zone is OFF regardless of appliance operatingMode.
@@ -147,6 +164,8 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
         # If the zone is active, determine HEAT or COOL from the appliance's operatingMode.
         appliance_data = self.coordinator.get_by_id(self.appliance_id)
+        if appliance_data is None:
+            return HVACMode.OFF
         operating_mode = appliance_data.get("operatingMode")
 
         if operating_mode is None:
@@ -162,6 +181,8 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
     @property
     def hvac_action(self) -> HVACAction | str | None:
         """Return HVAC action based on the activeComfortDemand field from the API."""
+        if self._data is None:
+            return None
         active_comfort = self._data.get("activeComfortDemand")
         if active_comfort in REMEHA_STATUS_TO_HVAC_ACTION:
             return REMEHA_STATUS_TO_HVAC_ACTION[active_comfort]
@@ -181,6 +202,8 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         'manual' when the zone is in manual mode.
         'schedule1/2/3' when in schedule mode, based on the active program number.
         """
+        if self._data is None:
+            return None
         zone_mode = self._data.get("zoneMode")
         if self.hvac_mode == HVACMode.OFF:
             return None
@@ -238,6 +261,9 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
             return
 
         if preset_mode == "manual":
+            if self.target_temperature is None:
+                _LOGGER.error("Cannot set manual preset without a target temperature")
+                return
             await self.api.async_set_manual(self.climate_zone_id, self.target_temperature)
         else:
             heating_program = int(preset_mode[-1])
@@ -254,6 +280,9 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         if self._requested_hvac_mode is not None:
             zone_data = self._data
             appliance_data = self.coordinator.get_by_id(self.appliance_id)
+            if zone_data is None:
+                super()._handle_coordinator_update()
+                return
 
             # Check OFF state via zoneMode on the zone
             if zone_data.get("zoneMode") == "FrostProtection":

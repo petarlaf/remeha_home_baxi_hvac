@@ -90,6 +90,11 @@ class RemehaHomeBinarySensor(CoordinatorEntity, BinarySensorEntity):
         return self.coordinator.get_by_id(self.item_id)
 
     @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return super().available and self._data is not None
+
+    @property
     def is_on(self) -> bool | None:
         """Return the state of this binary sensor."""
         data = self._data
