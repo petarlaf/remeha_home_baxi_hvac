@@ -69,9 +69,17 @@ class RemehaHomeSwitch(CoordinatorEntity, SwitchEntity):
         return self.coordinator.get_by_id(self.climate_zone_id)
 
     @property
-    def is_on(self) -> bool:
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return super().available and self._data is not None
+
+    @property
+    def is_on(self) -> bool | None:
         """Return the state of this switch."""
-        return self._data[self.entity_description.key]
+        data = self._data
+        if data is None:
+            return None
+        return data.get(self.entity_description.key)
 
     @property
     def device_info(self) -> DeviceInfo:
