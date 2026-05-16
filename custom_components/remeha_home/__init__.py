@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import aiohttp
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_entry_oauth2_flow
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .api import RemehaHomeOAuth2Implementation, RemehaHomeAPI
 from .config_flow import RemehaHomeLoginFlowHandler
@@ -25,10 +27,12 @@ PLATFORMS: list[Platform] = [
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up Remeha Home."""
     hass.data.setdefault(DOMAIN, {})
+    cookie_jar = aiohttp.CookieJar(quote_cookie=False)
+    session = async_create_clientsession(hass, cookie_jar=cookie_jar)
 
     RemehaHomeLoginFlowHandler.async_register_implementation(
         hass,
-        RemehaHomeOAuth2Implementation(async_get_clientsession(hass)),
+        RemehaHomeOAuth2Implementation(session),
     )
 
     return True
