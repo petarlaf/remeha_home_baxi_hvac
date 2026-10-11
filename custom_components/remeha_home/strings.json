@@ -5,7 +5,8 @@
             "reauth_successful": "Re-authentication was successful"
         },
         "error": {
-            "failed_to_authenticate": "Invalid email address and/or password"
+            "failed_to_authenticate": "Invalid email address and/or password",
+            "cannot_connect": "Unable to complete the Remeha Home login. Please try again later."
         },
         "step": {
             "auth": {

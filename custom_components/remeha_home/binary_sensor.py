@@ -102,7 +102,7 @@ class RemehaHomeBinarySensor(CoordinatorEntity, BinarySensorEntity):
             for part in self.entity_description.key.split("."):
                 data = data[part]
         except (KeyError, TypeError):
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Key not found in data: %s", self.entity_description.key
             )
             return None
