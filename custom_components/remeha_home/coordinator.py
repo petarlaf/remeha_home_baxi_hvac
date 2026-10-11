@@ -9,7 +9,8 @@ from aiohttp.client_exceptions import ClientError, ClientResponseError
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 import homeassistant.util.dt as dt_util
 
@@ -17,6 +18,11 @@ from .api import RemehaHomeAPI
 from .const import DEFAULT_CONSUMPTION_DATA, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# Home Assistant 2026.10 replaced the `via_device` identifier tuple with
+# `via_device_id`, the parent's device registry id; older versions only accept
+# `via_device`.
+SUPPORTS_VIA_DEVICE_ID = "via_device_id" in DeviceInfo.__annotations__
 
 
 class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
@@ -36,6 +42,8 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
         self.api = api
         self.items = {}
         self.device_info = {}
+        self.parent_appliance = {}
+        self.appliance_device_ids = {}
         self.technical_info = {}
         self.appliance_consumption_data = {}
         self.appliance_last_consumption_data_update = {}
@@ -156,6 +164,7 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
         now = dt_util.now()
         items = {}
         device_info = {}
+        parent_appliance = {}
 
         for appliance in data.get("appliances", []):
             appliance_id = appliance["applianceId"]
@@ -212,8 +221,8 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                     model=gateway_info["name"],
                     hw_version=gateway_info["hardwareVersion"],
                     sw_version=gateway_info["softwareVersion"],
-                    via_device=(DOMAIN, appliance_id),
                 )
+                parent_appliance[climate_zone_id] = appliance_id
 
             for hot_water_zone in appliance.get("hotWaterZones", []):
                 hot_water_zone_id = hot_water_zone["hotWaterZoneId"]
@@ -223,17 +232,42 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                     name=(hot_water_zone.get("name") or "Hot Water Zone").strip(),
                     manufacturer="Remeha",
                     model="Hot Water Zone",
-                    via_device=(DOMAIN, appliance_id),
                 )
+                parent_appliance[hot_water_zone_id] = appliance_id
 
         self.items = items
         self.device_info = device_info
+        self.parent_appliance = parent_appliance
         return data
 
     def get_by_id(self, item_id: str):
         """Return item with the specified item id."""
         return self.items.get(item_id)
 
-    def get_device_info(self, item_id: str):
+    def async_register_appliance_devices(self) -> None:
+        """Register the appliance devices so zone devices can link to them.
+
+        Must run before the platforms are set up: a zone device's
+        `via_device_id` has to refer to an already registered device.
+        """
+        device_registry = dr.async_get(self.hass)
+        for appliance in self.data.get("appliances", []):
+            appliance_id = appliance["applianceId"]
+            device = device_registry.async_get_or_create(
+                config_entry_id=self.config_entry.entry_id,
+                **self.device_info[appliance_id],
+            )
+            self.appliance_device_ids[appliance_id] = device.id
+
+    def get_device_info(self, item_id: str) -> DeviceInfo | None:
         """Return device info for the item with the specified id."""
-        return self.device_info.get(item_id)
+        device_info = self.device_info.get(item_id)
+        appliance_id = self.parent_appliance.get(item_id)
+        if device_info is None or appliance_id is None:
+            return device_info
+
+        if not SUPPORTS_VIA_DEVICE_ID:
+            return DeviceInfo(**device_info, via_device=(DOMAIN, appliance_id))
+        if (device_id := self.appliance_device_ids.get(appliance_id)) is None:
+            return device_info
+        return DeviceInfo(**device_info, via_device_id=device_id)
