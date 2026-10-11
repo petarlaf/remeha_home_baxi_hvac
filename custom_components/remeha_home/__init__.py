@@ -51,6 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = RemehaHomeUpdateCoordinator(hass, entry, api)
 
     await coordinator.async_config_entry_first_refresh()
+    coordinator.async_register_appliance_devices()
 
     hass.data[DOMAIN][entry.entry_id] = {
         "api": api,
