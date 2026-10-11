@@ -5,7 +5,8 @@
             "reauth_successful": "La ré-authentification a réussi"
         },
         "error": {
-            "failed_to_authenticate": "Adresse email ou mot de passe invalide"
+            "failed_to_authenticate": "Adresse email ou mot de passe invalide",
+            "cannot_connect": "Impossible de terminer la connexion à Remeha Home. Veuillez réessayer plus tard."
         },
         "step": {
             "auth": {

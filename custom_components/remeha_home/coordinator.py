@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from aiohttp.client_exceptions import ClientError, ClientResponseError
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.entity import DeviceInfo
@@ -21,11 +22,14 @@ _LOGGER = logging.getLogger(__name__)
 class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
     """Remeha Home update coordinator."""
 
-    def __init__(self, hass: HomeAssistant, api: RemehaHomeAPI) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, api: RemehaHomeAPI
+    ) -> None:
         """Initialize Remeha Home update coordinator."""
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=timedelta(seconds=60),
         )
