@@ -48,7 +48,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     oauth_session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
     api = RemehaHomeAPI(oauth_session)
-    coordinator = RemehaHomeUpdateCoordinator(hass, api)
+    coordinator = RemehaHomeUpdateCoordinator(hass, entry, api)
 
     await coordinator.async_config_entry_first_refresh()
 

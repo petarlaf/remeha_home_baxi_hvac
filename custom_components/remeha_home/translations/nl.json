@@ -5,7 +5,8 @@
             "reauth_successful": "Herverificatie was succesvol"
         },
         "error": {
-            "failed_to_authenticate": "Verkeerd e-mailadres en/of wachtwoord"
+            "failed_to_authenticate": "Verkeerd e-mailadres en/of wachtwoord",
+            "cannot_connect": "Kan het inloggen bij Remeha Home niet voltooien. Probeer het later opnieuw."
         },
         "step": {
             "auth": {

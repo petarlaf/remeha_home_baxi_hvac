@@ -89,16 +89,15 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the measurement value for this sensor."""
-        data = self._data
-        for part in self.entity_description.key.split("."):
-            # If the key is missing for some reason, don't crash — return None
-            if part not in data:
-                _LOGGER.warning(
-                    "Key not found in data: %s", self.entity_description.key
-                )
-                return None
-            data = data[part]
-        value = data
+        value = self._data
+        try:
+            for part in self.entity_description.key.split("."):
+                value = value[part]
+        except (KeyError, TypeError):
+            # The key is missing or a parent object is null; this is evaluated on
+            # every state write, so keep it at debug level to avoid log spam.
+            _LOGGER.debug("Key not found in data: %s", self.entity_description.key)
+            return None
 
         if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
             # Guard against None values (e.g. boostModeEndTime when not in boost mode)
