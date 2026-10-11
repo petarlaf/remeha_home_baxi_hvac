@@ -10,7 +10,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.helpers.config_entry_oauth2_flow import AbstractOAuth2FlowHandler
 
 from .const import DOMAIN
-from .api import RemehaHomeAuthFailed
+from .api import RemehaHomeAuthFailed, RemehaHomeLoginError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,6 +60,9 @@ class RemehaHomeLoginFlowHandler(AbstractOAuth2FlowHandler, domain=DOMAIN):
                 return await self.async_step_creation()
             except RemehaHomeAuthFailed:
                 errors["base"] = "failed_to_authenticate"
+            except RemehaHomeLoginError as err:
+                _LOGGER.warning("Unexpected response during Remeha Home login: %s", err)
+                errors["base"] = "cannot_connect"
 
         if user_input is None or errors:
             return self.async_show_form(

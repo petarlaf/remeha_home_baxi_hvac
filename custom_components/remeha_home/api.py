@@ -7,7 +7,7 @@ import hashlib
 import json
 import logging
 import secrets
-import urllib
+import urllib.parse
 from json import JSONDecodeError
 
 from aiohttp import ClientSession
@@ -224,6 +224,10 @@ class RemehaHomeAuthFailed(Exception):
     """Error to indicate that authentication failed."""
 
 
+class RemehaHomeLoginError(Exception):
+    """Error to indicate that the login flow returned an unexpected response."""
+
+
 class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
     """Custom OAuth2 implementation for the Remeha Home integration."""
 
@@ -280,7 +284,9 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
             response.raise_for_status()
 
             # Find the request id from the headers and package it up in base64 encoded json
-            request_id = response.headers["x-request-id"]
+            request_id = response.headers.get("x-request-id")
+            if request_id is None:
+                raise RemehaHomeLoginError("Login page did not return a request id")
             state_properties_json = f'{{"TID":"{request_id}"}}'.encode("ascii")
             state_properties = (
                 base64.urlsafe_b64encode(state_properties_json)
@@ -290,13 +296,18 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
 
             # Find the CSRF token in the "x-ms-cpim-csrf" header
             csrf_token = next(
-                cookie.value
-                for cookie in self._session.cookie_jar
-                if (
-                    cookie.key == "x-ms-cpim-csrf"
-                    and cookie["domain"] == "remehalogin.bdrthermea.net"
-                )
+                (
+                    cookie.value
+                    for cookie in self._session.cookie_jar
+                    if (
+                        cookie.key == "x-ms-cpim-csrf"
+                        and cookie["domain"] == "remehalogin.bdrthermea.net"
+                    )
+                ),
+                None,
             )
+            if csrf_token is None:
+                raise RemehaHomeLoginError("Login page did not set a CSRF cookie")
 
             # Post the user credentials to authenticate
             response = await self._session.post(
@@ -322,7 +333,7 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
                     "Remeha Home authentication returned an unexpected non-JSON response"
                 )
                 raise RemehaHomeAuthFailed from err
-            if response_json["status"] != "200":
+            if response_json.get("status") != "200":
                 raise RemehaHomeAuthFailed
 
             # Request the authentication complete callback
@@ -339,9 +350,14 @@ class RemehaHomeOAuth2Implementation(AbstractOAuth2Implementation):
             response.raise_for_status()
 
             # Parse the callback url for the authorization code
-            parsed_callback_url = urllib.parse.urlparse(response.headers["location"])
+            location = response.headers.get("location")
+            if location is None:
+                raise RemehaHomeLoginError("Login did not redirect to the callback url")
+            parsed_callback_url = urllib.parse.urlparse(location)
             query_string_dict = urllib.parse.parse_qs(parsed_callback_url.query)
-            authorization_code = query_string_dict["code"]
+            if "code" not in query_string_dict:
+                raise RemehaHomeLoginError("Callback url has no authorization code")
+            authorization_code = query_string_dict["code"][0]
 
             # Request a new token with the authorization code
             grant_params = {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import logging
+import time
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -25,6 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Mappings for appliance operating mode ↔ HVAC mode
 OPERATING_MODE_TO_HVAC_MODE = {
+    "AutomaticHeating": HVACMode.HEAT,
     "AutomaticCoolingHeating": HVACMode.HEAT,
     "ForcedCooling": HVACMode.COOL,
     "FrostProtection": HVACMode.OFF,
@@ -34,6 +36,10 @@ HVAC_MODE_TO_OPERATING_MODE = {
     HVACMode.HEAT: "AutomaticCoolingHeating",
     HVACMode.COOL: "ForcedCooling",
 }
+
+# How long an optimistically shown HVAC mode is kept while waiting for the API to
+# report the requested state, before falling back to what the API reports.
+OPTIMISTIC_HVAC_MODE_TIMEOUT = 180
 
 # Allowed preset modes
 ALLOWED_PRESET_MODES = ["manual", "schedule1", "schedule2", "schedule3"]
@@ -98,6 +104,7 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
 
         self._attr_unique_id = "_".join([DOMAIN, self.climate_zone_id])
         self._requested_hvac_mode: HVACMode | None = None
+        self._requested_hvac_mode_expires = 0.0
 
     @property
     def _data(self) -> dict:
@@ -146,13 +153,8 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
             return None
         return self._data.get("setPointMax")
 
-    @property
-    def hvac_mode(self) -> HVACMode | str | None:
-        """Return the current HVAC mode."""
-        # Use the override if available (set optimistically after a user action)
-        if self._requested_hvac_mode is not None:
-            return self._requested_hvac_mode
-
+    def _reported_hvac_mode(self) -> HVACMode:
+        """Return the HVAC mode as reported by the API."""
         zone_data = self._data
         if zone_data is None:
             return HVACMode.OFF
@@ -172,6 +174,18 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
             return HVACMode.OFF
 
         return OPERATING_MODE_TO_HVAC_MODE.get(operating_mode, HVACMode.OFF)
+
+    @property
+    def hvac_mode(self) -> HVACMode | str | None:
+        """Return the current HVAC mode."""
+        # Use the override if available (set optimistically after a user action)
+        if (
+            self._requested_hvac_mode is not None
+            and time.monotonic() < self._requested_hvac_mode_expires
+        ):
+            return self._requested_hvac_mode
+
+        return self._reported_hvac_mode()
 
     @property
     def hvac_modes(self) -> list[HVACMode] | list[str]:
@@ -238,15 +252,44 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         _LOGGER.debug("Setting HVAC mode to %s", hvac_mode)
         if hvac_mode in (HVACMode.HEAT, HVACMode.COOL):
             mode_payload = HVAC_MODE_TO_OPERATING_MODE[hvac_mode]
-            await self.api.async_set_operating_mode(self.appliance_id, mode_payload)
-            self._requested_hvac_mode = hvac_mode
+            # Only change the appliance-wide operating mode (which affects every
+            # zone) when it is not already in the requested heating/cooling mode.
+            appliance_data = self.coordinator.get_by_id(self.appliance_id)
+            if (
+                appliance_data is None
+                or OPERATING_MODE_TO_HVAC_MODE.get(appliance_data.get("operatingMode"))
+                != hvac_mode
+            ):
+                await self.api.async_set_operating_mode(self.appliance_id, mode_payload)
+
+            # The appliance operating mode does not take the zone out of
+            # anti-frost, so resume the zone's schedule when it is turned off.
+            zone_data = self._data
+            if zone_data is not None and zone_data.get("zoneMode") == "FrostProtection":
+                program = zone_data.get("activeHeatingClimateTimeProgramNumber")
+                await self.api.async_set_schedule(
+                    self.climate_zone_id, program if program in (1, 2, 3) else 1
+                )
         elif hvac_mode == HVACMode.OFF:
             await self.api.async_set_off(self.climate_zone_id)
-            self._requested_hvac_mode = HVACMode.OFF
         else:
             raise NotImplementedError(f"Unsupported HVAC mode: {hvac_mode}")
 
+        self._requested_hvac_mode = hvac_mode
+        self._requested_hvac_mode_expires = (
+            time.monotonic() + OPTIMISTIC_HVAC_MODE_TIMEOUT
+        )
         await self.coordinator.async_request_refresh()
+
+    async def async_turn_on(self) -> None:
+        """Turn the zone on, keeping the appliance's current heating/cooling mode."""
+        appliance_data = self.coordinator.get_by_id(self.appliance_id) or {}
+        hvac_mode = OPERATING_MODE_TO_HVAC_MODE.get(
+            appliance_data.get("operatingMode"), HVACMode.HEAT
+        )
+        if hvac_mode == HVACMode.OFF:
+            hvac_mode = HVACMode.HEAT
+        await self.async_set_hvac_mode(hvac_mode)
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode.
@@ -275,24 +318,13 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         """Handle updated data from the coordinator.
 
         Once new data is fetched, clear the optimistic HVAC mode override if
-        the appliance's reported state now matches what was requested.
+        the reported state now matches what was requested, or if the API has
+        not caught up within the timeout.
         """
-        if self._requested_hvac_mode is not None:
-            zone_data = self._data
-            appliance_data = self.coordinator.get_by_id(self.appliance_id)
-            if zone_data is None:
-                super()._handle_coordinator_update()
-                return
-
-            # Check OFF state via zoneMode on the zone
-            if zone_data.get("zoneMode") == "FrostProtection":
-                actual_mode = HVACMode.OFF
-            else:
-                # For HEAT/COOL, read operatingMode from the appliance
-                operating_mode = appliance_data.get("operatingMode") if appliance_data else None
-                actual_mode = OPERATING_MODE_TO_HVAC_MODE.get(operating_mode, HVACMode.OFF)
-
-            if actual_mode == self._requested_hvac_mode:
-                self._requested_hvac_mode = None
+        if self._requested_hvac_mode is not None and (
+            self._reported_hvac_mode() == self._requested_hvac_mode
+            or time.monotonic() >= self._requested_hvac_mode_expires
+        ):
+            self._requested_hvac_mode = None
 
         super()._handle_coordinator_update()
