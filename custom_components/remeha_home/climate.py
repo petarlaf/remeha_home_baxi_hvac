@@ -26,6 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Mappings for appliance operating mode ↔ HVAC mode
 OPERATING_MODE_TO_HVAC_MODE = {
+    "AutomaticHeating": HVACMode.HEAT,
     "AutomaticCoolingHeating": HVACMode.HEAT,
     "ForcedCooling": HVACMode.COOL,
     "FrostProtection": HVACMode.OFF,
@@ -251,10 +252,13 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         _LOGGER.debug("Setting HVAC mode to %s", hvac_mode)
         if hvac_mode in (HVACMode.HEAT, HVACMode.COOL):
             mode_payload = HVAC_MODE_TO_OPERATING_MODE[hvac_mode]
+            # Only change the appliance-wide operating mode (which affects every
+            # zone) when it is not already in the requested heating/cooling mode.
             appliance_data = self.coordinator.get_by_id(self.appliance_id)
             if (
                 appliance_data is None
-                or appliance_data.get("operatingMode") != mode_payload
+                or OPERATING_MODE_TO_HVAC_MODE.get(appliance_data.get("operatingMode"))
+                != hvac_mode
             ):
                 await self.api.async_set_operating_mode(self.appliance_id, mode_payload)
 
