@@ -11,6 +11,7 @@ from homeassistant.components.switch import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -36,6 +37,11 @@ async def async_setup_entry(
 
             entities.append(
                 RemehaHomeFireplaceModeSwitch(api, coordinator, climate_zone_id)
+            )
+            entities.append(
+                RemehaHomePreheatSwitch(
+                    api, coordinator, appliance["applianceId"], climate_zone_id
+                )
             )
 
     async_add_entities(entities)
@@ -126,3 +132,69 @@ class RemehaHomeFireplaceModeSwitch(RemehaHomeSwitch):
         _LOGGER.debug("Disable fireplace mode")
         await self.api.async_set_fireplace_mode(self.climate_zone_id, False)
         await self.coordinator.async_request_refresh()
+
+
+class RemehaHomePreheatSwitch(RemehaHomeSwitch):
+    """Pre-heat of a climate zone.
+
+    The cloud only accepts pre-heat for all climate zones of an appliance in one
+    request, so this sends the current state of the other zones unchanged.
+    """
+
+    def __init__(
+        self,
+        api: RemehaHomeAPI,
+        coordinator: RemehaHomeUpdateCoordinator,
+        appliance_id: str,
+        climate_zone_id: str,
+    ) -> None:
+        """Create a Remeha Home pre-heat switch entity."""
+        super().__init__(
+            api,
+            coordinator,
+            climate_zone_id,
+            SwitchEntityDescription(
+                key="preHeat",
+                name="Pre-heat",
+                icon="mdi:clock-start",
+            ),
+        )
+        self.appliance_id = appliance_id
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return the pre-heat state of this climate zone."""
+        data = self._data
+        if data is None:
+            return None
+        return (data.get("preHeat") or {}).get("enabled")
+
+    async def _async_set_preheat(self, enabled: bool) -> None:
+        """Write pre-heat for this zone and keep every other zone as it is."""
+        appliance = self.coordinator.get_by_id(self.appliance_id) or {}
+        enabled_by_zone: dict[str, bool] = {}
+        for zone in appliance.get("climateZones", []):
+            zone_id = zone["climateZoneId"]
+            if zone_id == self.climate_zone_id:
+                enabled_by_zone[zone_id] = enabled
+                continue
+            current = (zone.get("preHeat") or {}).get("enabled")
+            if current is None:
+                raise HomeAssistantError(
+                    "Pre-heat state of the other climate zones is unknown; "
+                    "try again after the next data refresh."
+                )
+            enabled_by_zone[zone_id] = current
+
+        await self.api.async_set_preheat(self.appliance_id, enabled_by_zone)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_on(self, **kwargs):
+        """Turn pre-heat on for this climate zone."""
+        _LOGGER.debug("Enable pre-heat for climate zone %s", self.climate_zone_id)
+        await self._async_set_preheat(True)
+
+    async def async_turn_off(self, **kwargs):
+        """Turn pre-heat off for this climate zone."""
+        _LOGGER.debug("Disable pre-heat for climate zone %s", self.climate_zone_id)
+        await self._async_set_preheat(False)

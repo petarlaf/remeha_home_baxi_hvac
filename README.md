@@ -83,8 +83,10 @@ This integration aims to create the following entities based on your system's ca
     *   Schedule activity temperatures (per Climate Zone): the 5 heating and 5 cooling presets the time programs use. Custom activity names from the app are used as entity names.
 *   **Select (`select.*`):**
     *   Operating Mode (Appliance): Off, Heating and cooling (automatic) or Cooling (Off or Heating on heat-only appliances). This switches the whole system; turning a climate entity off only puts that zone in frost protection.
+    *   Heating Program (Climate Zone): Program 1, 2 or 3, the heating time program the zone follows. Selecting one uses the same call as the Schedule 1/2/3 presets, so it also switches the zone into schedule mode. Refused while the appliance is Off.
 *   **Switches (`switch.*`):**
     *   Fireplace Mode (Climate - if supported)
+    *   Pre-heat (Climate Zone): the API sets pre-heat for all climate zones of the appliance in one request, so this sends the current state of the other zones unchanged.
 
 ### Notes
 
@@ -119,6 +121,10 @@ This integration aims to create the following entities based on your system's ca
 4.  Enter the email address and password you use for your Remeha/Baxi/etc. mobile app.
 5.  Click "Submit".
 6.  The integration will discover your devices and add the corresponding entities.
+
+## Diagnostics
+
+Open `Settings` > `Devices & Services` > `Remeha Home` and choose `Download diagnostics`. The file contains the integration version, the entry and coordinator state, the dashboard, technical details (gateway software and hardware versions), active errors, the latest daily consumption and the heating curve and activity settings. Passwords, tokens, your account email, the home name, location and hardware serial numbers are redacted before the file is created. Appliance and zone IDs are kept so they can be matched to entities.
 
 ## Known Issues / Future Work
 

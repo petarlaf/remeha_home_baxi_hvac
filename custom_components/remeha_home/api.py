@@ -314,6 +314,24 @@ class RemehaHomeAPI:
         )
         response.raise_for_status()
 
+    async def async_set_preheat(self, appliance_id: str, enabled_by_zone: dict[str, bool]) -> None:
+        """Set pre-heat for the climate zones of an appliance.
+
+        The body lists every climate zone of the appliance (zone id -> enabled),
+        so callers must pass the current value of each zone they do not change.
+        """
+        response = await self._async_api_request(
+            "POST",
+            f"/appliances/{appliance_id}/preheat",
+            json={
+                "climateZones": [
+                    {"climateZoneId": zone_id, "preHeatEnabled": enabled}
+                    for zone_id, enabled in enabled_by_zone.items()
+                ]
+            },
+        )
+        response.raise_for_status()
+
 
 class RemehaHomeAuthFailed(Exception):
     """Error to indicate that authentication failed."""
