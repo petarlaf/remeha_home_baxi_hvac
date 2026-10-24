@@ -14,6 +14,7 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_HALVES, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -304,6 +305,17 @@ class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):
         if preset_mode not in ALLOWED_PRESET_MODES:
             _LOGGER.error("Preset mode %s is not allowed", preset_mode)
             return
+
+        # Any zone mode command makes the cloud switch the whole appliance from
+        # "Off" to heating/cooling, so a preset change would silently turn the
+        # system back on. Require an explicit turn-on instead.
+        appliance_data = self.coordinator.get_by_id(self.appliance_id) or {}
+        if appliance_data.get("operatingMode") == "Off":
+            raise ServiceValidationError(
+                "The appliance is switched off. Turn it on first (climate "
+                "turn on or the Operating Mode select), then choose a preset; "
+                "changing the preset now would switch the whole system on."
+            )
 
         if preset_mode == "manual":
             if self.target_temperature is None:
