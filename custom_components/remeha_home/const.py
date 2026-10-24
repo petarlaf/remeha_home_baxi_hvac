@@ -154,8 +154,15 @@ PRODUCER_TYPE_NAMES = {
 }
 
 # Per-producer statistics from the daily energy consumption endpoint. Energy
-# values are today's totals and reset at midnight; seasonalEfficiency is the
-# seasonal COP the app shows and is not a daily value.
+# values are today's totals in whole kWh and reset at midnight;
+# seasonalEfficiency is the seasonal COP the app shows and is not a daily value.
+#
+# Only the producer totals are reliable: the producers' totals add up to the
+# appliance's consumption, and the heat pump's delivered total plus the backup
+# heater's consumption add up to the appliance's delivered energy. The split
+# per use is not: the heat pump's hot water figures include the backup heater
+# (often more than the heat pump's own total), and the backup heater books its
+# hot water energy as heating. Those sensors are created disabled.
 PRODUCER_SENSOR_TYPES = [
     SensorEntityDescription(
         key="energyConsumptionCH",
@@ -224,13 +231,17 @@ PRODUCER_SENSOR_TYPES = [
 
 # Producer sensors enabled by default; the rest are created disabled.
 PRODUCER_SENSORS_ENABLED_BY_DEFAULT = {
-    "HeatPumpAirSource": {"energyConsumptionTotal", "seasonalEfficiency"},
-    "HeatPumpGroundSource": {"energyConsumptionTotal", "seasonalEfficiency"},
-    "ElectricBackup": {
-        "energyConsumptionCH",
-        "energyConsumptionDHW",
+    "HeatPumpAirSource": {
         "energyConsumptionTotal",
+        "energyProductionTotal",
+        "seasonalEfficiency",
     },
+    "HeatPumpGroundSource": {
+        "energyConsumptionTotal",
+        "energyProductionTotal",
+        "seasonalEfficiency",
+    },
+    "ElectricBackup": {"energyConsumptionTotal"},
 }
 
 CLIMATE_ZONE_SENSOR_TYPES = [
