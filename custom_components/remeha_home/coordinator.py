@@ -47,6 +47,55 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
         self.technical_info = {}
         self.appliance_consumption_data = {}
         self.appliance_last_consumption_data_update = {}
+        self.appliance_active_errors = {}
+
+    async def _async_update_active_errors(self, appliance_id: str) -> list | None:
+        """Refresh the active errors, keeping the last known list on failure."""
+        try:
+            async with asyncio.timeout(15):
+                errors = await self.api.async_get_active_errors(appliance_id)
+            if not isinstance(errors, list):
+                _LOGGER.warning(
+                    "Unexpected active errors response for appliance %s: %s",
+                    appliance_id,
+                    errors,
+                )
+            else:
+                if errors != self.appliance_active_errors.get(appliance_id):
+                    _LOGGER.debug(
+                        "Active errors for appliance %s: %s", appliance_id, errors
+                    )
+                self.appliance_active_errors[appliance_id] = errors
+        except ClientResponseError as err:
+            if err.status == 401:
+                raise ConfigEntryAuthFailed from err
+            _LOGGER.warning(
+                "Failed to request active errors for appliance %s: %s",
+                appliance_id,
+                err,
+            )
+        except (TimeoutError, ClientError) as err:
+            _LOGGER.warning(
+                "Failed to request active errors for appliance %s: %s",
+                appliance_id,
+                err,
+            )
+
+        return self.appliance_active_errors.get(appliance_id)
+
+    @staticmethod
+    def _producers_by_key(consumption_data: dict | None) -> dict:
+        """Index the per-producer statistics by '<producerType>_<instance>'."""
+        statistics = (consumption_data or {}).get("producerPerformanceStatistics")
+        producers = (statistics or {}).get("producers") or []
+        result = {}
+        for producer in producers:
+            producer_type = producer.get("producerType")
+            if not producer_type:
+                continue
+            instance = producer.get("instanceWithinDevice") or 1
+            result[f"{producer_type}_{instance}"] = producer
+        return result
 
     async def _async_get_technical_info(self, appliance: dict) -> dict:
         """Return cached technical info, falling back to safe defaults."""
@@ -180,6 +229,10 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                 consumption_data.copy()
                 if consumption_data
                 else DEFAULT_CONSUMPTION_DATA.copy()
+            )
+            appliance["producers"] = self._producers_by_key(consumption_data)
+            appliance["activeErrors"] = await self._async_update_active_errors(
+                appliance_id
             )
 
             device_info[appliance_id] = DeviceInfo(

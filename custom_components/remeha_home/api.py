@@ -143,6 +143,15 @@ class RemehaHomeAPI:
         response.raise_for_status()
         return await response.json()
 
+    async def async_get_active_errors(self, appliance_id: str) -> list:
+        """Get the list of currently active errors for an appliance."""
+        response = await self._async_api_request(
+            "GET",
+            f"/appliances/{appliance_id}/activeerrors",
+        )
+        response.raise_for_status()
+        return await response.json()
+
     async def async_get_consumption_data_for_today(self, appliance_id: str) -> dict:
         """Get consumption data for an appliance for today."""
         today = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
