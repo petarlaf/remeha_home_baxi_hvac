@@ -83,8 +83,10 @@ This integration aims to create the following entities based on your system's ca
     *   Schedule activity temperatures (per Climate Zone): the 5 heating and 5 cooling presets the time programs use. Custom activity names from the app are used as entity names.
 *   **Select (`select.*`):**
     *   Operating Mode (Appliance): Off, Heating and cooling (automatic) or Cooling (Off or Heating on heat-only appliances). This switches the whole system; turning a climate entity off only puts that zone in frost protection.
+    *   Heating Program (Climate Zone): Program 1, 2 or 3, the heating time program the zone follows. Selecting one uses the same call as the Schedule 1/2/3 presets, so it also switches the zone into schedule mode. Refused while the appliance is Off.
 *   **Switches (`switch.*`):**
     *   Fireplace Mode (Climate - if supported)
+    *   Pre-heat (Climate Zone): the API sets pre-heat for all climate zones of the appliance in one request, so this sends the current state of the other zones unchanged.
 
 ### Notes
 
