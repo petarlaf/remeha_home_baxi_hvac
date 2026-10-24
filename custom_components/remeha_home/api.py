@@ -143,6 +143,15 @@ class RemehaHomeAPI:
         response.raise_for_status()
         return await response.json()
 
+    async def async_get_active_errors(self, appliance_id: str) -> list:
+        """Get the list of currently active errors for an appliance."""
+        response = await self._async_api_request(
+            "GET",
+            f"/appliances/{appliance_id}/activeerrors",
+        )
+        response.raise_for_status()
+        return await response.json()
+
     async def async_get_consumption_data_for_today(self, appliance_id: str) -> dict:
         """Get consumption data for an appliance for today."""
         today = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -216,6 +225,92 @@ class RemehaHomeAPI:
             "POST",
             f"/hot-water-zones/{hot_water_zone_id}/reduced-setpoint",
             json={"reducedSetpoint": temperature},
+        )
+        response.raise_for_status()
+
+    async def _async_get_json(self, path: str):
+        """GET a path and return the decoded JSON body."""
+        response = await self._async_api_request("GET", path)
+        response.raise_for_status()
+        return await response.json()
+
+    async def async_get_heating_curve(self, climate_zone_id: str) -> dict:
+        """Get the heating curve (slope, base setpoint, limits) of a climate zone."""
+        return await self._async_get_json(f"/climate-zones/{climate_zone_id}/heating-curve")
+
+    async def async_set_heating_curve(
+        self, climate_zone_id: str, slope: float, base_setpoint: float
+    ) -> None:
+        """Set the heating curve of a climate zone."""
+        response = await self._async_api_request(
+            "POST",
+            f"/climate-zones/{climate_zone_id}/heating-curve",
+            json={"slope": slope, "baseSetpoint": base_setpoint},
+        )
+        response.raise_for_status()
+
+    async def async_get_activities(self, climate_zone_id: str) -> list:
+        """Get the heating and cooling activity (schedule preset) temperatures."""
+        return await self._async_get_json(f"/climate-zones/{climate_zone_id}/activities")
+
+    async def async_set_activities(self, climate_zone_id: str, activities: list) -> None:
+        """Replace the activity temperatures of a climate zone.
+
+        Each item needs activityNumber, type ("Heating"/"Cooling"), name and
+        temperature; send the full list as returned by async_get_activities.
+        """
+        response = await self._async_api_request(
+            "PUT",
+            f"/climate-zones/{climate_zone_id}/activities",
+            json=[
+                {
+                    "activityNumber": activity["activityNumber"],
+                    "type": activity["type"],
+                    "name": activity.get("name") or "",
+                    "temperature": activity["temperature"],
+                }
+                for activity in activities
+            ],
+        )
+        response.raise_for_status()
+
+    async def async_get_climate_time_program(
+        self, climate_zone_id: str, program_type: str, program_number: int
+    ) -> dict:
+        """Get a climate zone time program ("heating" 1-3 or "cooling" 1)."""
+        return await self._async_get_json(
+            f"/climate-zones/{climate_zone_id}/time-programs/{program_type}/{program_number}"
+        )
+
+    async def async_set_climate_time_program(
+        self,
+        climate_zone_id: str,
+        program_type: str,
+        program_number: int,
+        switch_points: list,
+    ) -> None:
+        """Replace the switch points of a climate zone time program."""
+        response = await self._async_api_request(
+            "PUT",
+            f"/climate-zones/{climate_zone_id}/time-programs/{program_type}/{program_number}",
+            json={"switchPoints": switch_points},
+        )
+        response.raise_for_status()
+
+    async def async_get_hot_water_time_program(self, hot_water_zone_id: str) -> dict:
+        """Get the hot water time program (the API only has program 1)."""
+        return await self._async_get_json(
+            f"/hot-water-zones/{hot_water_zone_id}/time-programs/1"
+        )
+
+    async def async_set_hot_water_time_program(
+        self, hot_water_zone_id: str, switch_points: list
+    ) -> None:
+        """Replace the switch points of the hot water time program."""
+        response = await self._async_api_request(
+            "PUT",
+            f"/hot-water-zones/{hot_water_zone_id}/time-programs/1",
+            json={"switchPoints": switch_points},
         )
         response.raise_for_status()
 

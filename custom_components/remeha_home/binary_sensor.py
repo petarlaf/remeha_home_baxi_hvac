@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
+    APPLIANCE_BINARY_SENSOR_TYPES,
     CLIMATE_ZONE_BINARY_SENSOR_TYPES,
     HOT_WATER_ZONE_BINARY_SENSOR_TYPES,
 )
@@ -32,6 +33,17 @@ async def async_setup_entry(
 
     entities = []
     for appliance in coordinator.data["appliances"]:
+        appliance_id = appliance["applianceId"]
+        for entity_description, transform_func in APPLIANCE_BINARY_SENSOR_TYPES:
+            entities.append(
+                RemehaHomeBinarySensor(
+                    coordinator,
+                    appliance_id,
+                    entity_description,
+                    transform_func,
+                )
+            )
+
         for climate_zone in appliance["climateZones"]:
             climate_zone_id = climate_zone["climateZoneId"]
             for (
@@ -105,6 +117,9 @@ class RemehaHomeBinarySensor(CoordinatorEntity, BinarySensorEntity):
             _LOGGER.debug(
                 "Key not found in data: %s", self.entity_description.key
             )
+            return None
+
+        if data is None:
             return None
 
         return self.transform_func(data)

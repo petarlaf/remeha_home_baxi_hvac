@@ -26,6 +26,7 @@ import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import RemehaHomeUpdateCoordinator
+from .schedule import async_register_hot_water_schedule_services
 from .api import RemehaHomeAPI
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ async def async_setup_entry(
                 RemehaHomeWaterHeater(api, coordinator, hot_water_zone_id)
             )
     async_add_entities(entities)
+    async_register_hot_water_schedule_services()
 
 
 class RemehaHomeWaterHeater(CoordinatorEntity, WaterHeaterEntity):
