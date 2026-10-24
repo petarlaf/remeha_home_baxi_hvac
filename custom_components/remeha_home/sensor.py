@@ -1,6 +1,7 @@
 """Platform for sensor integration."""
 
 from __future__ import annotations
+import dataclasses
 import logging
 
 from homeassistant.components.sensor import (
@@ -16,10 +17,14 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 import homeassistant.util.dt as dt_util
 
 from .const import (
+    ACTIVE_ERRORS_SENSOR_TYPE,
     APPLIANCE_SENSOR_TYPES,
     CLIMATE_ZONE_SENSOR_TYPES,
     DOMAIN,
     HOT_WATER_ZONE_SENSOR_TYPES,
+    PRODUCER_SENSOR_TYPES,
+    PRODUCER_SENSORS_ENABLED_BY_DEFAULT,
+    PRODUCER_TYPE_NAMES,
 )
 from .coordinator import RemehaHomeUpdateCoordinator
 
@@ -42,6 +47,14 @@ async def async_setup_entry(
                 RemehaHomeSensor(coordinator, appliance_id, entity_description)
             )
 
+        entities.append(
+            RemehaHomeActiveErrorsSensor(
+                coordinator, appliance_id, ACTIVE_ERRORS_SENSOR_TYPE
+            )
+        )
+
+        entities.extend(_producer_sensors(coordinator, appliance))
+
         for climate_zone in appliance["climateZones"]:
             climate_zone_id = climate_zone["climateZoneId"]
             for entity_description in CLIMATE_ZONE_SENSOR_TYPES:
@@ -58,6 +71,47 @@ async def async_setup_entry(
 
     async_add_entities(entities)
 
+
+def _producer_sensors(
+    coordinator: RemehaHomeUpdateCoordinator, appliance: dict
+) -> list[RemehaHomeSensor]:
+    """Create sensors for each producer (heat pump, backup heater, ...).
+
+    Producers come from the daily energy statistics, so they are only known if
+    that request succeeded during setup. Fields the API reports as null for a
+    producer (e.g. energy delivered by the backup heater) are skipped.
+    """
+    producers = appliance.get("producers") or {}
+    type_counts: dict[str, int] = {}
+    for producer in producers.values():
+        producer_type = producer.get("producerType")
+        type_counts[producer_type] = type_counts.get(producer_type, 0) + 1
+
+    entities = []
+    for producer_key, producer in producers.items():
+        producer_type = producer["producerType"]
+        label = PRODUCER_TYPE_NAMES.get(producer_type, producer_type)
+        if type_counts[producer_type] > 1:
+            label = f"{label} {producer.get('instanceWithinDevice') or 1}"
+        enabled_keys = PRODUCER_SENSORS_ENABLED_BY_DEFAULT.get(producer_type, set())
+
+        for description in PRODUCER_SENSOR_TYPES:
+            if producer.get(description.key) is None:
+                continue
+            entities.append(
+                RemehaHomeSensor(
+                    coordinator,
+                    appliance["applianceId"],
+                    dataclasses.replace(
+                        description,
+                        key=f"producers.{producer_key}.{description.key}",
+                        name=f"{label} {description.name}",
+                        entity_registry_enabled_default=description.key
+                        in enabled_keys,
+                    ),
+                )
+            )
+    return entities
 
 class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Sensor."""
@@ -134,3 +188,35 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
     def device_info(self) -> DeviceInfo:
         """Return device info for this device."""
         return self.coordinator.get_device_info(self.item_id)
+
+
+class RemehaHomeActiveErrorsSensor(RemehaHomeSensor):
+    """Number of active appliance errors, with the raw list as an attribute."""
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the number of active errors."""
+        errors = self._data.get("activeErrors")
+        if errors is None:
+            return None
+        return len(errors)
+
+    @property
+    def icon(self) -> str:
+        """Return an icon reflecting whether there are active errors."""
+        if self.native_value:
+            return "mdi:alert-circle"
+        return "mdi:alert-circle-check-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return the active errors as reported by the API."""
+        errors = self._data.get("activeErrors") or []
+        return {
+            "errors": errors,
+            "error_codes": [
+                error.get("errorCode")
+                for error in errors
+                if isinstance(error, dict) and error.get("errorCode") is not None
+            ],
+        }
