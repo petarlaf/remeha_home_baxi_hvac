@@ -45,6 +45,14 @@
                     "automatic_cooling_heating": "Heating and cooling (automatic)",
                     "forced_cooling": "Cooling"
                 }
+            },
+            "heating_program": {
+                "name": "Heating program",
+                "state": {
+                    "1": "Program 1",
+                    "2": "Program 2",
+                    "3": "Program 3"
+                }
             }
         }
     },
