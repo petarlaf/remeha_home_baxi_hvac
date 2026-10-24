@@ -325,7 +325,7 @@ class RemehaHomeAPI:
             f"/appliances/{appliance_id}/preheat",
             json={
                 "climateZones": [
-                    {"climateZoneId": zone_id, "preheating": {"enabled": enabled}}
+                    {"climateZoneId": zone_id, "preHeatEnabled": enabled}
                     for zone_id, enabled in enabled_by_zone.items()
                 ]
             },
