@@ -14,6 +14,7 @@ from .api import RemehaHomeOAuth2Implementation, RemehaHomeAPI
 from .config_flow import RemehaHomeLoginFlowHandler
 from .const import DOMAIN
 from .coordinator import RemehaHomeUpdateCoordinator
+from .signalr import RemehaHomeSignalR
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -61,6 +62,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Push updates: the background task is cancelled automatically on unload.
+    signalr = RemehaHomeSignalR(hass, api, coordinator.async_request_refresh)
+    entry.async_create_background_task(
+        hass, signalr.async_run(), "remeha_home_signalr"
+    )
 
     return True
 
