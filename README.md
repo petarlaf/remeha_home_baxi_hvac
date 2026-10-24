@@ -120,6 +120,10 @@ This integration aims to create the following entities based on your system's ca
 5.  Click "Submit".
 6.  The integration will discover your devices and add the corresponding entities.
 
+## Diagnostics
+
+Open `Settings` > `Devices & Services` > `Remeha Home` and choose `Download diagnostics`. The file contains the integration version, the entry and coordinator state, the dashboard, technical details (gateway software and hardware versions), active errors, the latest daily consumption and the heating curve and activity settings. Passwords, tokens, your account email, the home name, location and hardware serial numbers are redacted before the file is created. Appliance and zone IDs are kept so they can be matched to entities.
+
 ## Known Issues / Future Work
 
 *   The underlying BDR Thermea API is not publicly documented.
