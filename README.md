@@ -81,8 +81,14 @@ This integration aims to create the following entities based on your system's ca
 *   **Numbers (`number.*`, configuration):**
     *   Heating Curve Slope and Base Setpoint (per Climate Zone), with the limits reported by the API
     *   Schedule activity temperatures (per Climate Zone): the 5 heating and 5 cooling presets the time programs use. Custom activity names from the app are used as entity names.
+*   **Select (`select.*`):**
+    *   Operating Mode (Appliance): Off, Heating and cooling (automatic) or Cooling (Off or Heating on heat-only appliances). This switches the whole system; turning a climate entity off only puts that zone in frost protection.
 *   **Switches (`switch.*`):**
     *   Fireplace Mode (Climate - if supported)
+
+### Notes
+
+*   Any zone mode command (such as choosing a schedule preset) makes the cloud switch an appliance that is Off back on. The climate entity therefore refuses preset changes while the appliance is Off; turn it on first.
 
 ### Services
 

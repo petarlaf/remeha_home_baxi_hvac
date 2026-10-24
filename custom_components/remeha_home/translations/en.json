@@ -35,6 +35,17 @@
                     }
                 }
             }
+        },
+        "select": {
+            "operating_mode": {
+                "name": "Operating Mode",
+                "state": {
+                    "off": "Off",
+                    "automatic_heating": "Heating",
+                    "automatic_cooling_heating": "Heating and cooling (automatic)",
+                    "forced_cooling": "Cooling"
+                }
+            }
         }
     },
     "services": {
