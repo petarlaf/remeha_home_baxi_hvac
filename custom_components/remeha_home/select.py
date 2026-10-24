@@ -7,6 +7,7 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -26,6 +27,9 @@ OPERATING_MODE_OPTIONS = {
 }
 API_TO_OPTION = {value: key for key, value in OPERATING_MODE_OPTIONS.items()}
 
+# Heating time programs 1-3 of a climate zone (option = program number)
+HEATING_PROGRAM_OPTIONS = ["1", "2", "3"]
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -36,10 +40,22 @@ async def async_setup_entry(
         "coordinator"
     ]
 
-    async_add_entities(
+    entities: list[SelectEntity] = [
         RemehaHomeOperatingModeSelect(api, coordinator, appliance["applianceId"])
         for appliance in coordinator.data["appliances"]
-    )
+    ]
+    for appliance in coordinator.data["appliances"]:
+        for climate_zone in appliance.get("climateZones", []):
+            entities.append(
+                RemehaHomeHeatingProgramSelect(
+                    api,
+                    coordinator,
+                    appliance["applianceId"],
+                    climate_zone["climateZoneId"],
+                )
+            )
+
+    async_add_entities(entities)
 
 
 class RemehaHomeOperatingModeSelect(CoordinatorEntity, SelectEntity):
@@ -114,3 +130,72 @@ class RemehaHomeOperatingModeSelect(CoordinatorEntity, SelectEntity):
     def device_info(self) -> DeviceInfo:
         """Return device info for this device."""
         return self.coordinator.get_device_info(self.appliance_id)
+
+
+class RemehaHomeHeatingProgramSelect(CoordinatorEntity, SelectEntity):
+    """Heating time program (1-3) a climate zone follows.
+
+    Selecting a program calls the same schedule endpoint as the Schedule 1/2/3
+    presets, so it also switches the zone into schedule mode. Like the presets,
+    it is refused while the appliance is Off, because the cloud would switch the
+    whole appliance back on.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "heating_program"
+    _attr_icon = "mdi:calendar-clock"
+    _attr_options = HEATING_PROGRAM_OPTIONS
+
+    def __init__(
+        self,
+        api: RemehaHomeAPI,
+        coordinator: RemehaHomeUpdateCoordinator,
+        appliance_id: str,
+        climate_zone_id: str,
+    ) -> None:
+        """Create the heating program select for a climate zone."""
+        super().__init__(coordinator)
+        self.api = api
+        self.appliance_id = appliance_id
+        self.climate_zone_id = climate_zone_id
+        self._attr_unique_id = f"{DOMAIN}_{climate_zone_id}_heating_program_select"
+
+    @property
+    def _data(self) -> dict | None:
+        return self.coordinator.get_by_id(self.climate_zone_id)
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return super().available and self._data is not None
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the heating program the API reports as active."""
+        program = (self._data or {}).get("activeHeatingClimateTimeProgramNumber")
+        if program in (1, 2, 3):
+            return str(program)
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        """Switch the climate zone to the heating program."""
+        appliance_data = self.coordinator.get_by_id(self.appliance_id) or {}
+        if appliance_data.get("operatingMode") == "Off":
+            raise ServiceValidationError(
+                "The appliance is switched off. Turn it on first (climate turn on "
+                "or the Operating Mode select), then choose a heating program; "
+                "changing the program now would switch the whole system on."
+            )
+
+        _LOGGER.debug(
+            "Setting climate zone %s to heating program %s",
+            self.climate_zone_id,
+            option,
+        )
+        await self.api.async_set_schedule(self.climate_zone_id, int(option))
+        await self.coordinator.async_request_refresh()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info for this device."""
+        return self.coordinator.get_device_info(self.climate_zone_id)
