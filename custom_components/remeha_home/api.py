@@ -2,7 +2,7 @@
 
 import asyncio
 import base64
-import datetime
+import datetime as dt
 import hashlib
 import json
 import logging
@@ -155,7 +155,7 @@ class RemehaHomeAPI:
     async def async_get_consumption_data_for_today(self, appliance_id: str) -> dict:
         """Get consumption data for an appliance for today."""
         today = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_today = today + datetime.timedelta(hours=23, minutes=59, seconds=59)
+        end_of_today = today + dt.timedelta(hours=23, minutes=59, seconds=59)
 
         today_string = today.strftime("%Y-%m-%d %H:%M:%S.%fZ")
         end_of_today_string = end_of_today.strftime("%Y-%m-%d %H:%M:%S.%fZ")

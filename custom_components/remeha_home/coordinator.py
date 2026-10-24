@@ -189,7 +189,7 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
             now - self.appliance_last_consumption_data_update[appliance_id]
             < timedelta(minutes=14, seconds=45)
         ):
-            return self.appliance_consumption_data.get(appliance_id)
+            return self._consumption_data_for_today(appliance_id, now)
 
         try:
             async with asyncio.timeout(20):
@@ -226,7 +226,41 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                 err,
             )
 
-        return self.appliance_consumption_data.get(appliance_id)
+        return self._consumption_data_for_today(appliance_id, now)
+
+    def _consumption_data_for_today(self, appliance_id: str, now) -> dict | None:
+        """Return the cached daily row, or None if it belongs to an earlier day.
+
+        Daily rows are labelled with their local date (e.g.
+        "2026-10-24T18:00:00+00:00" for 24 Oct). If the request fails around
+        midnight, the cache still holds yesterday's row; exposing it after
+        midnight would make the daily totals look like they never reset.
+        """
+        data = self.appliance_consumption_data.get(appliance_id)
+        if data is None:
+            return None
+        timestamp = data.get("timeStamp")
+        if isinstance(timestamp, str) and not self._is_today(timestamp, now):
+            _LOGGER.debug(
+                "Dropping consumption data for %s from %s", appliance_id, timestamp
+            )
+            self.appliance_consumption_data.pop(appliance_id, None)
+            return None
+        return data
+
+    @staticmethod
+    def _is_today(timestamp: str, now) -> bool:
+        """Return True if a daily row's timestamp belongs to today's local date.
+
+        Finished days are stamped at midnight UTC of their date, while the row
+        for the current day can carry a UTC report time, which reads as the
+        previous date between local midnight and UTC midnight. Accept either.
+        """
+        today = now.date().isoformat()
+        if timestamp[:10] == today:
+            return True
+        parsed = dt_util.parse_datetime(timestamp)
+        return parsed is not None and dt_util.as_local(parsed).date().isoformat() == today
 
     @staticmethod
     def _default_technical_info(appliance: dict) -> dict:
