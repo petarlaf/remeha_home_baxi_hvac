@@ -47,6 +47,102 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
         self.technical_info = {}
         self.appliance_consumption_data = {}
         self.appliance_last_consumption_data_update = {}
+        self.appliance_active_errors = {}
+        self.zone_settings = {}
+        self.zone_settings_last_update = {}
+
+    async def _async_update_zone_settings(self, climate_zone_id: str, now) -> dict:
+        """Refresh a zone's heating curve and activity temperatures when due.
+
+        These change rarely and are not part of the dashboard, so they are
+        fetched every 15 minutes and right after a change made from HA.
+        """
+        last_update = self.zone_settings_last_update.get(climate_zone_id)
+        if last_update is not None and now - last_update < timedelta(
+            minutes=14, seconds=45
+        ):
+            return self.zone_settings.get(climate_zone_id, {})
+
+        settings = dict(self.zone_settings.get(climate_zone_id, {}))
+        for key, fetch in (
+            ("heatingCurve", self.api.async_get_heating_curve),
+            ("activities", self.api.async_get_activities),
+        ):
+            try:
+                async with asyncio.timeout(15):
+                    settings[key] = await fetch(climate_zone_id)
+            except ClientResponseError as err:
+                if err.status == 401:
+                    raise ConfigEntryAuthFailed from err
+                _LOGGER.warning(
+                    "Failed to request %s for climate zone %s: %s",
+                    key,
+                    climate_zone_id,
+                    err,
+                )
+            except (TimeoutError, ClientError) as err:
+                _LOGGER.warning(
+                    "Failed to request %s for climate zone %s: %s",
+                    key,
+                    climate_zone_id,
+                    err,
+                )
+
+        self.zone_settings[climate_zone_id] = settings
+        self.zone_settings_last_update[climate_zone_id] = now
+        return settings
+
+    def invalidate_zone_settings(self, climate_zone_id: str) -> None:
+        """Force the zone settings to be fetched on the next refresh."""
+        self.zone_settings_last_update.pop(climate_zone_id, None)
+
+    async def _async_update_active_errors(self, appliance_id: str) -> list | None:
+        """Refresh the active errors, keeping the last known list on failure."""
+        try:
+            async with asyncio.timeout(15):
+                errors = await self.api.async_get_active_errors(appliance_id)
+            if not isinstance(errors, list):
+                _LOGGER.warning(
+                    "Unexpected active errors response for appliance %s: %s",
+                    appliance_id,
+                    errors,
+                )
+            else:
+                if errors != self.appliance_active_errors.get(appliance_id):
+                    _LOGGER.debug(
+                        "Active errors for appliance %s: %s", appliance_id, errors
+                    )
+                self.appliance_active_errors[appliance_id] = errors
+        except ClientResponseError as err:
+            if err.status == 401:
+                raise ConfigEntryAuthFailed from err
+            _LOGGER.warning(
+                "Failed to request active errors for appliance %s: %s",
+                appliance_id,
+                err,
+            )
+        except (TimeoutError, ClientError) as err:
+            _LOGGER.warning(
+                "Failed to request active errors for appliance %s: %s",
+                appliance_id,
+                err,
+            )
+
+        return self.appliance_active_errors.get(appliance_id)
+
+    @staticmethod
+    def _producers_by_key(consumption_data: dict | None) -> dict:
+        """Index the per-producer statistics by '<producerType>_<instance>'."""
+        statistics = (consumption_data or {}).get("producerPerformanceStatistics")
+        producers = (statistics or {}).get("producers") or []
+        result = {}
+        for producer in producers:
+            producer_type = producer.get("producerType")
+            if not producer_type:
+                continue
+            instance = producer.get("instanceWithinDevice") or 1
+            result[f"{producer_type}_{instance}"] = producer
+        return result
 
     async def _async_get_technical_info(self, appliance: dict) -> dict:
         """Return cached technical info, falling back to safe defaults."""
@@ -181,6 +277,10 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                 if consumption_data
                 else DEFAULT_CONSUMPTION_DATA.copy()
             )
+            appliance["producers"] = self._producers_by_key(consumption_data)
+            appliance["activeErrors"] = await self._async_update_active_errors(
+                appliance_id
+            )
 
             device_info[appliance_id] = DeviceInfo(
                 identifiers={(DOMAIN, appliance_id)},
@@ -214,6 +314,9 @@ class RemehaHomeUpdateCoordinator(DataUpdateCoordinator):
                     }
 
                 items[climate_zone_id] = climate_zone
+                climate_zone.update(
+                    await self._async_update_zone_settings(climate_zone_id, now)
+                )
                 device_info[climate_zone_id] = DeviceInfo(
                     identifiers={(DOMAIN, climate_zone_id)},
                     name=(climate_zone.get("name") or "Climate Zone").strip(),
