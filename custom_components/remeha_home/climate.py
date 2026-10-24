@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .api import RemehaHomeAPI
 from .const import DOMAIN
 from .coordinator import RemehaHomeUpdateCoordinator
+from .schedule import async_register_climate_schedule_services
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ async def async_setup_entry(
             )
 
     async_add_entities(entities)
+    async_register_climate_schedule_services()
 
 
 class RemehaHomeClimateEntity(CoordinatorEntity, ClimateEntity):

@@ -67,8 +67,27 @@ This integration aims to create the following entities based on your system's ca
 *   **Binary Sensors (`binary_sensor.*`):**
     *   Climate Zone Heating Status (based on comfort demand)
     *   Hot Water Zone Heating Status
+    *   Online, Water Pressure Problem, Active Error, Holiday Mode (Appliance)
+    *   Pre-heat Enabled / Active (Climate Zone)
+    *   Anti-Legionella, DHW Optimization (Hot Water Zone, the latter disabled by default)
+*   **More sensors (`sensor.*`):**
+    *   Active Errors (Appliance): number of active faults, with the raw list from the API as an attribute
+    *   Thermal Mode, Operating Mode, Seasonal Mode (Appliance)
+    *   Per-producer daily energy, e.g. Heat Pump and Backup Heater consumed/delivered for heating, hot water and cooling. The backup heater sensors are enabled by default, so you can see how often the resistive heater runs.
+    *   Heat Pump Seasonal Efficiency (SCOP), as shown in the app
+    *   Holiday Start / End (Appliance, disabled by default)
+    *   Temporary Override End Time (Climate Zone)
+    *   Next Switch Time / Activity (Hot Water Zone)
+*   **Numbers (`number.*`, configuration):**
+    *   Heating Curve Slope and Base Setpoint (per Climate Zone), with the limits reported by the API
+    *   Schedule activity temperatures (per Climate Zone): the 5 heating and 5 cooling presets the time programs use. Custom activity names from the app are used as entity names.
 *   **Switches (`switch.*`):**
     *   Fireplace Mode (Climate - if supported)
+
+### Services
+
+*   `remeha_home.get_schedule` / `remeha_home.set_schedule` (climate entities): read or replace a time program (`program_type` heating 1-3 or cooling 1). Switch points are `{day, time, activity}`; call `get_schedule` first and edit its output, since the day numbering is the API's own (0-6).
+*   `remeha_home.get_hot_water_schedule` / `remeha_home.set_hot_water_schedule` (water heater): the same for the hot water program, with switch points `{day, time, comfortActive}`.
 
 *(Availability of some sensors/switches depends on your specific appliance model and configuration)*
 

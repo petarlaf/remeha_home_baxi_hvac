@@ -36,5 +36,53 @@
                 }
             }
         }
+    },
+    "services": {
+        "get_schedule": {
+            "name": "Get schedule",
+            "description": "Return the switch points of a climate zone time program.",
+            "fields": {
+                "program_type": {
+                    "name": "Program type",
+                    "description": "heating (programs 1-3) or cooling (program 1)."
+                },
+                "program_number": {
+                    "name": "Program number",
+                    "description": "Time program number, 1-3 for heating."
+                }
+            }
+        },
+        "set_schedule": {
+            "name": "Set schedule",
+            "description": "Replace the switch points of a climate zone time program. Use get_schedule to see the current format.",
+            "fields": {
+                "program_type": {
+                    "name": "Program type",
+                    "description": "heating (programs 1-3) or cooling (program 1)."
+                },
+                "program_number": {
+                    "name": "Program number",
+                    "description": "Time program number, 1-3 for heating."
+                },
+                "switch_points": {
+                    "name": "Switch points",
+                    "description": "List of {day (0-6, as returned by get_schedule), time (HH:MM), activity (1-5)}."
+                }
+            }
+        },
+        "get_hot_water_schedule": {
+            "name": "Get hot water schedule",
+            "description": "Return the switch points of the hot water time program."
+        },
+        "set_hot_water_schedule": {
+            "name": "Set hot water schedule",
+            "description": "Replace the switch points of the hot water time program. Use get_hot_water_schedule to see the current format.",
+            "fields": {
+                "switch_points": {
+                    "name": "Switch points",
+                    "description": "List of {day (0-6), time (HH:MM), comfortActive (true/false)}."
+                }
+            }
+        }
     }
 }

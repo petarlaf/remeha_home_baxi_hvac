@@ -1,0 +1,60 @@
+get_schedule:
+  target:
+    entity:
+      integration: remeha_home
+      domain: climate
+  fields:
+    program_type:
+      example: heating
+      selector:
+        select:
+          options: [heating, cooling]
+    program_number:
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 3
+          mode: box
+
+set_schedule:
+  target:
+    entity:
+      integration: remeha_home
+      domain: climate
+  fields:
+    program_type:
+      example: heating
+      selector:
+        select:
+          options: [heating, cooling]
+    program_number:
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 3
+          mode: box
+    switch_points:
+      required: true
+      example: '[{"day": 0, "time": "06:00", "activity": 2}, {"day": 0, "time": "22:00", "activity": 1}]'
+      selector:
+        object:
+
+get_hot_water_schedule:
+  target:
+    entity:
+      integration: remeha_home
+      domain: water_heater
+
+set_hot_water_schedule:
+  target:
+    entity:
+      integration: remeha_home
+      domain: water_heater
+  fields:
+    switch_points:
+      required: true
+      example: '[{"day": 0, "time": "06:00", "comfortActive": true}, {"day": 0, "time": "22:00", "comfortActive": false}]'
+      selector:
+        object:
