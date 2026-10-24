@@ -37,7 +37,9 @@ MESSAGE_TYPE_CLOSE = 7
 
 APPLIANCE_UPDATE_TARGET = "newMessage"
 
-# Send a keep-alive ping after this many seconds without inbound traffic.
+# Send a keep-alive ping every this many seconds, whatever the server sends:
+# Azure SignalR drops a client that has sent nothing for its client timeout
+# (30 s by default).
 PING_INTERVAL = 15
 # Drop the connection when the server has been silent this long (it pings
 # about every 15 seconds).
@@ -79,6 +81,11 @@ class RemehaHomeSignalR:
         self._on_appliance_updated = on_appliance_updated
         self._failures = 0
         self.connected = False
+        self.connected_since: float | None = None
+        self.last_message: float | None = None
+        self.messages = 0
+        self.connections = 0
+        self.last_error: str | None = None
 
     async def async_run(self) -> None:
         """Connect and listen until cancelled. Meant as a background task."""
@@ -92,10 +99,12 @@ class RemehaHomeSignalR:
             except Exception as err:
                 # Push is best effort: any error here must not reach Home Assistant.
                 self._failures += 1
+                self.last_error = f"{type(err).__name__}: {err}"
                 log = _LOGGER.warning if self._failures == 1 else _LOGGER.debug
                 log("Remeha Home push connection failed: %s", err)
             finally:
                 self.connected = False
+                self.connected_since = None
 
             if time.monotonic() - started >= HEALTHY_CONNECTION_SECONDS:
                 delay = BACKOFF_MIN
@@ -123,15 +132,19 @@ class RemehaHomeSignalR:
         ) as ws:
             await ws.send_str(HANDSHAKE_REQUEST)
             handshake_done = False
-            last_inbound = time.monotonic()
+            last_inbound = last_outbound = time.monotonic()
 
             while time.time() < renew_at:
-                try:
-                    msg = await ws.receive(timeout=PING_INTERVAL)
-                except TimeoutError:
-                    if time.monotonic() - last_inbound > SILENCE_TIMEOUT:
-                        raise ConnectionError("no traffic from the server") from None
+                now = time.monotonic()
+                if now - last_inbound > SILENCE_TIMEOUT:
+                    raise ConnectionError("no traffic from the server")
+                if now - last_outbound >= PING_INTERVAL:
                     await ws.send_str(PING_MESSAGE)
+                    last_outbound = now
+                wait = max(0.1, PING_INTERVAL - (now - last_outbound))
+                try:
+                    msg = await ws.receive(timeout=wait)
+                except TimeoutError:
                     continue
 
                 if msg.type == aiohttp.WSMsgType.TEXT:
@@ -160,6 +173,8 @@ class RemehaHomeSignalR:
         if response.get("error"):
             raise ConnectionError(f"handshake rejected: {response['error']}")
         self.connected = True
+        self.connected_since = time.time()
+        self.connections += 1
         self._failures = 0
         _LOGGER.debug("Remeha Home push connection established")
 
@@ -174,6 +189,8 @@ class RemehaHomeSignalR:
             if target == APPLIANCE_UPDATE_TARGET:
                 # Arguments look like [{"ApplianceId": ..., "MessageType": "ApplianceUpdate_Full"}]
                 _LOGGER.debug("Remeha Home push: %s, refreshing", _describe(message))
+                self.messages += 1
+                self.last_message = time.time()
                 await self._on_appliance_updated()
             else:
                 _LOGGER.debug("Remeha Home push: ignoring message %s", target)

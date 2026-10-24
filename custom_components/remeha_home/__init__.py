@@ -65,6 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Push updates: the background task is cancelled automatically on unload.
     signalr = RemehaHomeSignalR(hass, api, coordinator.async_request_refresh)
+    hass.data[DOMAIN][entry.entry_id]["signalr"] = signalr
     entry.async_create_background_task(
         hass, signalr.async_run(), "remeha_home_signalr"
     )
