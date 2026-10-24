@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -39,7 +39,28 @@ async def async_setup_entry(
     """Set up the Remeha Home sensor entities from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
+    # Producers come from the daily energy statistics, which have no row for a
+    # new day until the gateway's first report after midnight. Track which
+    # producer sensors exist so the ones missing at setup are added later.
+    known_producer_sensors: set[str] = set()
+
+    def _new_producer_sensors() -> list[RemehaHomeSensor]:
+        new_entities = []
+        for appliance in coordinator.data["appliances"]:
+            for entity in _producer_sensors(coordinator, appliance):
+                if entity.unique_id not in known_producer_sensors:
+                    known_producer_sensors.add(entity.unique_id)
+                    new_entities.append(entity)
+        return new_entities
+
+    @callback
+    def _async_add_new_producer_sensors() -> None:
+        if new_entities := _new_producer_sensors():
+            _LOGGER.debug("Adding %d producer sensors", len(new_entities))
+            async_add_entities(new_entities)
+
     entities = []
+    entities.extend(_new_producer_sensors())
     for appliance in coordinator.data["appliances"]:
         appliance_id = appliance["applianceId"]
         for entity_description in APPLIANCE_SENSOR_TYPES:
@@ -52,8 +73,6 @@ async def async_setup_entry(
                 coordinator, appliance_id, ACTIVE_ERRORS_SENSOR_TYPE
             )
         )
-
-        entities.extend(_producer_sensors(coordinator, appliance))
 
         for climate_zone in appliance["climateZones"]:
             climate_zone_id = climate_zone["climateZoneId"]
@@ -70,6 +89,9 @@ async def async_setup_entry(
                 )
 
     async_add_entities(entities)
+    entry.async_on_unload(
+        coordinator.async_add_listener(_async_add_new_producer_sensors)
+    )
 
 
 def _producer_sensors(
@@ -77,8 +99,8 @@ def _producer_sensors(
 ) -> list[RemehaHomeSensor]:
     """Create sensors for each producer (heat pump, backup heater, ...).
 
-    Producers come from the daily energy statistics, so they are only known if
-    that request succeeded during setup. Fields the API reports as null for a
+    Producers come from the daily energy statistics, so this returns nothing
+    while there is no row for today. Fields the API reports as null for a
     producer (e.g. energy delivered by the backup heater) are skipped.
     """
     producers = appliance.get("producers") or {}

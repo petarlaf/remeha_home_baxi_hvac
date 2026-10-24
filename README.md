@@ -73,7 +73,7 @@ This integration aims to create the following entities based on your system's ca
 *   **More sensors (`sensor.*`):**
     *   Active Errors (Appliance): number of active faults, with the raw list from the API as an attribute
     *   Thermal Mode, Operating Mode, Seasonal Mode (Appliance)
-    *   Per-producer daily energy, e.g. Heat Pump and Backup Heater consumed/delivered for heating, hot water and cooling. The backup heater sensors are enabled by default, so you can see how often the resistive heater runs.
+    *   Per-producer daily energy, e.g. Heat Pump and Backup Heater consumed/delivered. The totals (heat pump consumed and delivered, backup heater consumed) are enabled by default and suit the Energy dashboard as individual devices; the backup heater total shows how much the resistive heater runs. The per-use split (heating, hot water, cooling) is created disabled because the cloud attributes it inconsistently: the heat pump's hot water figures include the backup heater, and the backup heater books hot water as heating. Values are whole kWh, reset at local midnight, and stay unknown until the gateway's first report of the day (usually within 90 minutes). Sensors for a producer that isn't reported at startup are added once it appears.
     *   Heat Pump Seasonal Efficiency (SCOP), as shown in the app
     *   Holiday Start / End (Appliance, disabled by default)
     *   Temporary Override End Time (Climate Zone)
