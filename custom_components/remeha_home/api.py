@@ -132,6 +132,16 @@ class RemehaHomeAPI:
         response.raise_for_status()
         return await response.json()
 
+    async def async_negotiate_signalr(self) -> dict:
+        """Negotiate a SignalR connection for push updates.
+
+        Returns the Azure SignalR ``url`` and the client ``accessToken``. The
+        request has no body, the same as the official app sends.
+        """
+        response = await self._async_api_request("POST", "/homes/signalr/negotiate")
+        response.raise_for_status()
+        return await response.json()
+
     async def async_get_appliance_technical_information(
         self, appliance_id: str
     ) -> dict:
