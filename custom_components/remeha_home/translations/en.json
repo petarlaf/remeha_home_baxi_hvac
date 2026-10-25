@@ -1,107 +1,135 @@
 {
-    "config": {
-        "abort": {
-            "failed_to_authenticate": "Failed to authenticate",
-            "reauth_successful": "Re-authentication was successful"
-        },
-        "error": {
-            "failed_to_authenticate": "Invalid email address and/or password",
-            "cannot_connect": "Unable to complete the Remeha Home login. Please try again later."
-        },
-        "step": {
-            "auth": {
-                "description": "Set up the Remeha Home integration using your Remeha Home credentials.",
-                "data": {
-                    "email": "Email address",
-                    "password": "Password"
-                }
-            },
-            "reauth_confirm": {
-                "description": "Failed to refresh the Remeha Home access token. Please re-authenticate with your Remeha Home credentials to continue using this integration."
-            }
-        }
+  "config": {
+    "abort": {
+      "failed_to_authenticate": "Failed to authenticate",
+      "reauth_successful": "Re-authentication was successful"
     },
-    "entity": {
-        "climate": {
-            "remeha_home": {
-                "state_attributes": {
-                    "preset_mode": {
-                        "state": {
-                            "manual": "Manual",
-                            "schedule1": "Schedule 1",
-                            "schedule2": "Schedule 2",
-                            "schedule3": "Schedule 3"
-                        }
-                    }
-                }
-            }
-        },
-        "select": {
-            "operating_mode": {
-                "name": "Operating Mode",
-                "state": {
-                    "off": "Off",
-                    "automatic_heating": "Heating",
-                    "automatic_cooling_heating": "Heating and cooling (automatic)",
-                    "forced_cooling": "Cooling"
-                }
-            },
-            "heating_program": {
-                "name": "Heating program",
-                "state": {
-                    "1": "Program 1",
-                    "2": "Program 2",
-                    "3": "Program 3"
-                }
-            }
-        }
+    "error": {
+      "failed_to_authenticate": "Invalid email address and/or password",
+      "cannot_connect": "Unable to complete the Remeha Home login. Please try again later."
     },
-    "services": {
-        "get_schedule": {
-            "name": "Get schedule",
-            "description": "Return the switch points of a climate zone time program.",
-            "fields": {
-                "program_type": {
-                    "name": "Program type",
-                    "description": "heating (programs 1-3) or cooling (program 1)."
-                },
-                "program_number": {
-                    "name": "Program number",
-                    "description": "Time program number, 1-3 for heating."
-                }
-            }
-        },
-        "set_schedule": {
-            "name": "Set schedule",
-            "description": "Replace the switch points of a climate zone time program. Use get_schedule to see the current format.",
-            "fields": {
-                "program_type": {
-                    "name": "Program type",
-                    "description": "heating (programs 1-3) or cooling (program 1)."
-                },
-                "program_number": {
-                    "name": "Program number",
-                    "description": "Time program number, 1-3 for heating."
-                },
-                "switch_points": {
-                    "name": "Switch points",
-                    "description": "List of {day (0-6, as returned by get_schedule), time (HH:MM), activity (1-5)}."
-                }
-            }
-        },
-        "get_hot_water_schedule": {
-            "name": "Get hot water schedule",
-            "description": "Return the switch points of the hot water time program."
-        },
-        "set_hot_water_schedule": {
-            "name": "Set hot water schedule",
-            "description": "Replace the switch points of the hot water time program. Use get_hot_water_schedule to see the current format.",
-            "fields": {
-                "switch_points": {
-                    "name": "Switch points",
-                    "description": "List of {day (0-6), time (HH:MM), comfortActive (true/false)}."
-                }
-            }
+    "step": {
+      "auth": {
+        "description": "Set up the Remeha Home integration using your Remeha Home credentials.",
+        "data": {
+          "email": "Email address",
+          "password": "Password"
         }
+      },
+      "reauth_confirm": {
+        "description": "Failed to refresh the Remeha Home access token. Please re-authenticate with your Remeha Home credentials to continue using this integration."
+      }
     }
+  },
+  "entity": {
+    "climate": {
+      "remeha_home": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "manual": "Manual",
+              "schedule1": "Schedule 1",
+              "schedule2": "Schedule 2",
+              "schedule3": "Schedule 3"
+            }
+          }
+        }
+      }
+    },
+    "select": {
+      "operating_mode": {
+        "name": "Operating Mode",
+        "state": {
+          "off": "Off",
+          "automatic_heating": "Heating",
+          "automatic_cooling_heating": "Heating and cooling (automatic)",
+          "forced_cooling": "Cooling"
+        }
+      },
+      "heating_program": {
+        "name": "Heating program",
+        "state": {
+          "1": "Program 1",
+          "2": "Program 2",
+          "3": "Program 3"
+        }
+      }
+    }
+  },
+  "services": {
+    "get_schedule": {
+      "name": "Get schedule",
+      "description": "Return the switch points of a climate zone time program.",
+      "fields": {
+        "program_type": {
+          "name": "Program type",
+          "description": "heating (programs 1-3) or cooling (program 1)."
+        },
+        "program_number": {
+          "name": "Program number",
+          "description": "Time program number, 1-3 for heating."
+        }
+      }
+    },
+    "set_schedule": {
+      "name": "Set schedule",
+      "description": "Replace the switch points of a climate zone time program. Use get_schedule to see the current format.",
+      "fields": {
+        "program_type": {
+          "name": "Program type",
+          "description": "heating (programs 1-3) or cooling (program 1)."
+        },
+        "program_number": {
+          "name": "Program number",
+          "description": "Time program number, 1-3 for heating."
+        },
+        "switch_points": {
+          "name": "Switch points",
+          "description": "List of {day (0-6, as returned by get_schedule), time (HH:MM), activity (1-5)}."
+        }
+      }
+    },
+    "get_hot_water_schedule": {
+      "name": "Get hot water schedule",
+      "description": "Return the switch points of the hot water time program."
+    },
+    "set_hot_water_schedule": {
+      "name": "Set hot water schedule",
+      "description": "Replace the switch points of the hot water time program. Use get_hot_water_schedule to see the current format.",
+      "fields": {
+        "switch_points": {
+          "name": "Switch points",
+          "description": "List of {day (0-6), time (HH:MM), comfortActive (true/false)}."
+        }
+      }
+    },
+    "set_holiday": {
+      "name": "Set holiday",
+      "description": "Put the appliance in holiday mode for whole days. The current zone, hot water and operating modes are saved and restored when the holiday is cleared or ends.",
+      "fields": {
+        "start_date": {
+          "name": "Start date",
+          "description": "First day of the holiday."
+        },
+        "end_date": {
+          "name": "End date",
+          "description": "Last day of the holiday."
+        },
+        "device_id": {
+          "name": "Appliance",
+          "description": "Appliance device. Leave empty for every Remeha appliance."
+        }
+      }
+    },
+    "clear_holiday": {
+      "name": "Clear holiday",
+      "description": "End holiday mode now and restore the modes saved by Set holiday.",
+      "fields": {
+        "device_id": {
+          "name": "Appliance",
+          "description": "Appliance device. Leave empty for every Remeha appliance."
+        }
+      }
+    }
+  }
 }
