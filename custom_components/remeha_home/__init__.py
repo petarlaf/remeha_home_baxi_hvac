@@ -14,6 +14,8 @@ from .api import RemehaHomeOAuth2Implementation, RemehaHomeAPI
 from .config_flow import RemehaHomeLoginFlowHandler
 from .const import DOMAIN
 from .coordinator import RemehaHomeUpdateCoordinator
+from .holiday import async_get_manager as async_get_holiday_manager
+from .signalr import RemehaHomeSignalR
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -61,6 +63,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Holiday services: restore the saved modes once a holiday is over.
+    holiday = async_get_holiday_manager(hass)
+    await holiday.async_load()
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    entry.async_on_unload(
+        coordinator.async_add_listener(lambda: holiday.async_check_ended(entry_data))
+    )
+
+    # Push updates: the background task is cancelled automatically on unload.
+    signalr = RemehaHomeSignalR(hass, api, coordinator.async_request_refresh)
+    hass.data[DOMAIN][entry.entry_id]["signalr"] = signalr
+    entry.async_create_background_task(
+        hass, signalr.async_run(), "remeha_home_signalr"
+    )
 
     return True
 
