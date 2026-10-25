@@ -14,6 +14,7 @@ from homeassistant.const import (
     UnitOfEnergy,
     UnitOfPressure,
     UnitOfTemperature,
+    UnitOfTime,
 )
 
 DOMAIN = "remeha_home"
@@ -281,6 +282,13 @@ HOT_WATER_ZONE_SENSOR_TYPES = [
         key="dhwStatus",
         name="Status",
         entity_registry_enabled_default=False,
+    ),
+    SensorEntityDescription(
+        key="boostDuration",
+        name="Boost Duration",
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        device_class=SensorDeviceClass.DURATION,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SensorEntityDescription(
         key="boostModeEndTime",

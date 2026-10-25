@@ -194,6 +194,9 @@ class RemehaHomeSensor(CoordinatorEntity, SensorEntity):
                 parsed = parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
             return parsed
 
+        if self.entity_description.device_class == SensorDeviceClass.DURATION:
+            return _duration_minutes(value)
+
         return value
 
     @property
@@ -242,3 +245,18 @@ class RemehaHomeActiveErrorsSensor(RemehaHomeSensor):
                 if isinstance(error, dict) and error.get("errorCode") is not None
             ],
         }
+
+
+def _duration_minutes(value) -> int | None:
+    """Return an API duration ("HH:MM" or "HH:MM:SS") in minutes."""
+    if isinstance(value, (int, float)):
+        return int(value)
+    if not isinstance(value, str):
+        return None
+    try:
+        parts = [int(part) for part in value.split(":")]
+    except ValueError:
+        return None
+    if len(parts) < 2:
+        return None
+    return parts[0] * 60 + parts[1]

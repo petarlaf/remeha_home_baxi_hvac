@@ -1,143 +1,93 @@
-# Remeha Home / Baxi HVAC Integration for Home Assistant (Custom Fork)
+# Remeha Home / BAXI HVAC integration for Home Assistant
 
-This is a **custom fork** of the original Remeha Home integration by **msvisser** ([msvisser/remeha_home](https://github.com/msvisser/remeha_home)).
+A fork of [msvisser/remeha_home](https://github.com/msvisser/remeha_home) for BDR Thermea systems (Remeha, BAXI, De Dietrich, Brötje) that are controlled through the Remeha Home cloud. It adds hot water control, heating and cooling control that works with BAXI heat pumps, energy data per producer, schedule and heating curve settings, holiday mode, and push updates.
 
-This fork was created primarily to:
-1.  Provide **full Hot Water control** for BDR Thermea systems, a feature **missing** in the original integration.
-2.  Adapt the **Climate control** logic to work more reliably with the author's specific **BAXI HVAC system** (Heating & Cooling).
+It is developed and tested on a BAXI Platinum BC iPlus V200 Integra: an air-to-water heat pump with an electric backup heater, two climate zones and a hot water tank. Other appliances on the same cloud should work, but entities depend on what each appliance reports, and only this system has been tested.
 
-**Testing:** This fork has been developed and tested specifically on a **Baxi PLATINUM BC IPLUS V200 INTEGRA** system. While it may work on other Baxi or BDR Thermea models, compatibility is not guaranteed.
+You need a working account in the official Remeha Home app (or your brand's version of it). The integration logs in with the same email and password and uses the same cloud API. If the app can't control your system, this integration can't either.
 
----
+The fork was written with AI assistance and reviewed and tested live on the system above.
 
-## Key Improvements & Differences from Original (`msvisser/remeha_home`)
+## Devices and entities
 
-*   **⭐ New Water Heater Entity (`water_heater.remeha_home`):**
-    *   Provides full control over Domestic Hot Water (DHW) zones.
-    *   Supports Operation Modes: `Scheduled`, `Comfort`, `Eco` (Anti-Frost), and `Boost`.
-    *   Allows setting target temperatures specifically for `Comfort` and `Eco` modes via dedicated API calls.
-    *   `Boost` mode correctly implemented (only available from `Scheduled` mode) and displays remaining boost time as a state attribute.
-    *   *(The original integration only offered a temperature sensor for hot water).*
-*   **Climate Entity Enhancements (`climate.remeha_home`):**
-    *   Reworked `HVACMode` mapping for better Baxi compatibility: `HEAT` (`AutomaticCoolingHeating`), `COOL` (`ForcedCooling`), `OFF` (`FrostProtection`).
-    *   Simplified `PresetMode` handling: `manual`, `schedule1`, `schedule2`, `schedule3` directly trigger corresponding API modes.
-    *   Improved `HVACAction` detection (`Heating`, `Cooling`, `Idle`) based on the API's `activeComfortDemand` status.
-*   **⭐ New Energy Consumption Sensors:**
-    *   Added sensors for daily energy consumed/delivered for Heating, Hot Water, and Cooling (where applicable). Data is fetched periodically (approx. every 15 mins).
-*   **Enhanced Data Fetching:**
-    *   The integration now retrieves appliance technical details (model name, gateway versions) and energy consumption data from the API.
-*   **API Client:**
-    *   Added new API functions to support all the features above.
-    *   Includes specific error handling for known API quirks (e.g., 400 error on token refresh).
+The integration creates one device per appliance (the heating gateway), one per climate zone and one per hot water zone, named as in the app. Entity IDs follow those names, for example `climate.<zone name>` and `sensor.<appliance name>_water_pressure`.
 
-**Note:** The development of this fork was assisted by AI, as the author is not a developer. While functional for the author's tested model, further refinements or bug fixes might be required for broader compatibility.
+### Appliance
 
----
+- Operating mode select: Off, heating and cooling (automatic), or cooling (Off or heating on heat-only appliances). This switches the whole system.
+- Sensors: water pressure, outdoor temperature, cloud outdoor temperature (disabled by default), error status, active errors (count, with the raw list as an attribute), thermal mode, operating mode, seasonal mode, holiday start and end (disabled by default).
+- Binary sensors: online, water pressure problem, active error, holiday mode.
+- Daily energy for the appliance: heating, hot water and cooling, consumed and delivered (disabled by default; these are the consistent figures for the Energy dashboard).
+- Daily energy per producer, for example heat pump and backup heater. The totals (heat pump consumed and delivered, backup heater consumed) are enabled by default and show how much the resistive backup heater runs. The heating/hot water/cooling split per producer is disabled by default, because the cloud books it inconsistently (the heat pump's hot water figure includes the backup heater, and the backup heater books hot water as heating).
+- Heat pump seasonal efficiency (SCOP), as shown in the app.
 
-## General Information (Applies to Fork)
+Energy values are whole kWh, reset at local midnight, and stay unknown until the gateway's first report of the day, usually within 90 minutes. Producer sensors that aren't reported at startup are added when they appear.
 
-This integration lets you control your Remeha Home thermostats (and compatible BDR Thermea brands like Baxi, De Dietrich, Brötje) from Home Assistant.
+### Climate zone
 
-**Prerequisite:** You **must** be able to set up and control your thermostat using the official [Remeha Home app](https://play.google.com/store/apps/details?id=com.bdrthermea.application.remeha) (or the equivalent app for your brand: Baxi, De Dietrich, etc.). If the official app doesn't work for your system, this integration will likely not work either. Log in using the same credentials as your official app.
+- Climate entity. HVAC modes: heat, cool and off (off puts only this zone in frost protection). Presets: manual, schedule1, schedule2 and schedule3. HVAC action (heating, cooling, idle) comes from the zone's comfort demand.
+- Heating program select (program 1, 2 or 3). Selecting one also puts the zone in schedule mode.
+- Pre-heat switch, fireplace mode switch (if supported).
+- Heating curve slope and base setpoint numbers, within the limits the API reports.
+- Activity temperature numbers: the 5 heating and 5 cooling temperatures the time programs use, named after the activity names set in the app. The cooling ones are disabled by default.
+- Sensors: next setpoint and its time, current schedule setpoint, temporary override end time.
+- Binary sensors: pre-heat enabled, pre-heat active, heating status (disabled by default).
 
-## Provided Entities (This Fork)
+### Hot water zone
 
-This integration aims to create the following entities based on your system's capabilities:
+- Water heater entity with the modes Scheduled, Comfort, Eco (anti-frost) and Boost, and target temperatures for Comfort and Eco. Boost can only be started from Scheduled; while it runs, the remaining time is an attribute.
+- Sensors: water temperature, boost duration, boost end time, next switch time and activity, status (disabled by default).
+- Binary sensors: anti-legionella, heating status and DHW optimisation (both disabled by default).
 
-*   **Climate (`climate.remeha_home`):** Controls the main heating/cooling zone.
-    *   Status: Current Temp, Target Temp, HVAC Action (Heating/Cooling/Idle)
-    *   Controls: HVAC Mode (Heat, Cool, Off), Preset Mode (Manual, Schedule 1/2/3), Target Temperature.
-*   **Water Heater (`water_heater.remeha_home`):** Controls the domestic hot water zone.
-    *   Status: Current Temp, Target Temp (varies by mode), Current Operation Mode.
-    *   Controls: Operation Mode (Scheduled, Comfort, Eco, Boost), Target Temperature (in Comfort/Eco modes).
-    *   Attributes: Remaining Boost Time (when active).
-*   **Sensors (`sensor.*`):**
-    *   Outdoor Temperature (Appliance, if available)
-    *   Cloud Outdoor Temperature (Appliance, disabled by default)
-    *   Water Pressure (Appliance, if available)
-    *   Heating Energy Consumed/Delivered (Appliance, Daily, disabled by default)
-    *   Hot Water Energy Consumed/Delivered (Appliance, Daily, disabled by default)
-    *   Cooling Energy Consumed/Delivered (Appliance, Daily, disabled by default)
-    *   Error Status (Appliance)
-    *   Next Schedule Setpoint & Time (Climate Zone)
-    *   Current Schedule Setpoint (Climate Zone)
-    *   Water Temperature (Hot Water Zone)
-    *   Hot Water Status (Hot Water Zone, disabled by default)
-    *   Boost Mode End Time (Hot Water Zone)
-*   **Binary Sensors (`binary_sensor.*`):**
-    *   Climate Zone Heating Status (based on comfort demand)
-    *   Hot Water Zone Heating Status
-    *   Online, Water Pressure Problem, Active Error, Holiday Mode (Appliance)
-    *   Pre-heat Enabled / Active (Climate Zone)
-    *   Anti-Legionella, DHW Optimization (Hot Water Zone, the latter disabled by default)
-*   **More sensors (`sensor.*`):**
-    *   Active Errors (Appliance): number of active faults, with the raw list from the API as an attribute
-    *   Thermal Mode, Operating Mode, Seasonal Mode (Appliance)
-    *   Per-producer daily energy, e.g. Heat Pump and Backup Heater consumed/delivered. The totals (heat pump consumed and delivered, backup heater consumed) are enabled by default and suit the Energy dashboard as individual devices; the backup heater total shows how much the resistive heater runs. The per-use split (heating, hot water, cooling) is created disabled because the cloud attributes it inconsistently: the heat pump's hot water figures include the backup heater, and the backup heater books hot water as heating. Values are whole kWh, reset at local midnight, and stay unknown until the gateway's first report of the day (usually within 90 minutes). Sensors for a producer that isn't reported at startup are added once it appears.
-    *   Heat Pump Seasonal Efficiency (SCOP), as shown in the app
-    *   Holiday Start / End (Appliance, disabled by default)
-    *   Temporary Override End Time (Climate Zone)
-    *   Next Switch Time / Activity (Hot Water Zone)
-*   **Numbers (`number.*`, configuration):**
-    *   Heating Curve Slope and Base Setpoint (per Climate Zone), with the limits reported by the API
-    *   Schedule activity temperatures (per Climate Zone): the 5 heating and 5 cooling presets the time programs use. Custom activity names from the app are used as entity names.
-*   **Select (`select.*`):**
-    *   Operating Mode (Appliance): Off, Heating and cooling (automatic) or Cooling (Off or Heating on heat-only appliances). This switches the whole system; turning a climate entity off only puts that zone in frost protection.
-    *   Heating Program (Climate Zone): Program 1, 2 or 3, the heating time program the zone follows. Selecting one uses the same call as the Schedule 1/2/3 presets, so it also switches the zone into schedule mode. Refused while the appliance is Off.
-*   **Switches (`switch.*`):**
-    *   Fireplace Mode (Climate - if supported)
-    *   Pre-heat (Climate Zone): the API sets pre-heat for all climate zones of the appliance in one request, so this sends the current state of the other zones unchanged.
+## Services
 
-### Notes
+- `remeha_home.get_schedule` and `remeha_home.set_schedule` (climate entities) read or replace a time program: `program_type` heating (programs 1-3) or cooling (program 1). Switch points are `{day, time, activity}`. Call `get_schedule` first and edit its output, because the day numbering (0-6) is the API's own.
+- `remeha_home.get_hot_water_schedule` and `remeha_home.set_hot_water_schedule` (water heater) do the same for the hot water program, with switch points `{day, time, comfortActive}`.
+- `remeha_home.set_holiday` (`start_date`, `end_date`, optional appliance `device_id`) sets holiday mode for whole days. While a holiday is active, the cloud puts every climate zone in frost protection and turns hot water off. Before setting it, the integration saves each zone's mode, program and setpoint, the hot water mode and the appliance operating mode. The saved state survives restarts.
+- `remeha_home.clear_holiday` (optional `device_id`) ends the holiday and restores the saved modes. The cloud does not restore them by itself, so the integration also restores them on the first poll after a holiday set from Home Assistant has been cancelled in the app or has ended. A holiday set in the app is not restored, because nothing was saved for it.
 
-*   Any zone mode command (such as choosing a schedule preset) makes the cloud switch an appliance that is Off back on. The climate entity therefore refuses preset changes while the appliance is Off; turn it on first.
+## Push updates
 
-### Services
+Besides polling every 60 seconds, the integration keeps a SignalR connection to the Remeha cloud, as the app does. When the cloud reports a change made in the app, on a thermostat or by the appliance, Home Assistant refreshes within a few seconds. If the push connection drops, updates fall back to polling while it reconnects. The connection state is in the diagnostics download under `push`.
 
-*   `remeha_home.get_schedule` / `remeha_home.set_schedule` (climate entities): read or replace a time program (`program_type` heating 1-3 or cooling 1). Switch points are `{day, time, activity}`; call `get_schedule` first and edit its output, since the day numbering is the API's own (0-6).
-*   `remeha_home.get_hot_water_schedule` / `remeha_home.set_hot_water_schedule` (water heater): the same for the hot water program, with switch points `{day, time, comfortActive}`.
-*   `remeha_home.set_holiday` (`start_date`, `end_date`, optional appliance `device_id`): holiday mode for whole days. The cloud keeps dates only, starts at once when today is in range, and while active puts every climate zone in frost protection and turns hot water off. Before setting it, the integration saves each zone's mode, program and setpoint, the hot water mode and the appliance operating mode (kept across restarts).
-*   `remeha_home.clear_holiday` (optional `device_id`): ends the holiday now and restores the saved modes. The cloud itself does not restore them, so the same restore also runs on the first poll after a holiday set from Home Assistant is cancelled in the app or has ended. Restoring briefly switches an Off appliance on (zone mode writes do that) and then back Off. A holiday set in the app is not restored, because nothing was saved.
+## Things to know
 
-### Push updates
-
-The integration keeps a SignalR connection to the Remeha cloud, as the official app does. When the cloud reports a change (from the app, a thermostat or the appliance), Home Assistant refreshes within a few seconds instead of waiting for the next 60 second poll. Polling continues, so a dropped push connection only slows updates down; it reconnects with backoff and renews its token before it expires. Its state is in the diagnostics download under `push`.
-
-*(Availability of some sensors/switches depends on your specific appliance model and configuration)*
+- Any zone mode command (a schedule preset, a program, frost protection) makes the cloud switch an appliance that is Off back on. The climate presets and the program select therefore refuse to act while the appliance is Off; turn it on first. Restoring modes after a holiday does switch an Off appliance on for a few seconds and then back Off.
+- Holidays always cover whole local days, and a holiday that includes today starts at once.
+- The cloud API doesn't provide flow or return temperatures, live power, compressor state or installer parameters.
 
 ## Installation
 
-### HACS (Recommended)
+### HACS
 
-1.  Add this repository URL (`https://github.com/petarlaf/remeha_home_baxi_hvac`) as a custom repository in HACS (Integration type).
-2.  Search for "Remeha Home Baxi HVAC" (or similar) under Integrations and install it.
-3.  Restart Home Assistant.
+1. In HACS, add `https://github.com/petarlaf/remeha_home_baxi_hvac` as a custom repository of type Integration.
+2. Install "Remeha Home" and restart Home Assistant.
 
-### Manual Installation
+If HACS fails to download releases with `Got more than 8190 bytes when reading`, that is a HACS problem with GitHub's current download headers ([hacs/integration#5643](https://github.com/hacs/integration/issues/5643)). Install manually until a fixed HACS version is out.
 
-1.  Ensure the `custom_components` folder exists in your Home Assistant configuration directory (where `configuration.yaml` is).
-2.  Copy the complete `custom_components/remeha_home` folder from this repository into your `custom_components` directory.
-3.  Restart Home Assistant.
+### Manual
+
+1. Download `remeha_home.zip` from the [latest release](https://github.com/petarlaf/remeha_home_baxi_hvac/releases/latest).
+2. Extract it into `custom_components/remeha_home` in your Home Assistant configuration directory.
+3. Restart Home Assistant.
+
+Home Assistant 2025.1.4 or newer is required.
 
 ## Setup
 
-1.  In Home Assistant, go to `Settings` > `Devices & Services`.
-2.  Click `+ Add Integration`.
-3.  Search for and select `Remeha Home`.
-4.  Enter the email address and password you use for your Remeha/Baxi/etc. mobile app.
-5.  Click "Submit".
-6.  The integration will discover your devices and add the corresponding entities.
+1. Go to Settings > Devices & services and choose Add integration.
+2. Search for Remeha Home.
+3. Log in with the email address and password of your Remeha Home app account.
 
 ## Diagnostics
 
-Open `Settings` > `Devices & Services` > `Remeha Home` and choose `Download diagnostics`. The file contains the integration version, the entry and coordinator state, the dashboard, technical details (gateway software and hardware versions), active errors, the latest daily consumption, the heating curve and activity settings, and the push connection state. Passwords, tokens, your account email, the home name, location and hardware serial numbers are redacted before the file is created. Appliance and zone IDs are kept so they can be matched to entities.
+Open Settings > Devices & services > Remeha Home and choose Download diagnostics. The file contains the integration version, the entry and coordinator state, the push connection state, the dashboard data, technical details (gateway software and hardware versions), active errors, the latest daily consumption, and the heating curve and activity settings. Passwords, tokens, the account email, the home name, the location and hardware serial numbers are redacted. Appliance and zone IDs are kept so they can be matched to entities.
 
-## Known Issues / Future Work
+## Limitations
 
-*   The underlying BDR Thermea API is not publicly documented.
-*   Error handling for less common API responses could potentially be improved.
-*   No automated tests are included in this fork.
+- The BDR Thermea cloud API is not publicly documented. Payloads were worked out from the app and tested live on one system.
+- There are no automated tests in this repository.
 
 ## Acknowledgements
 
-*   Based heavily on the original work of **msvisser** ([msvisser/remeha_home](https://github.com/msvisser/remeha_home)).
+Based on the original integration by [msvisser](https://github.com/msvisser/remeha_home).
