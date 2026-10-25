@@ -63,8 +63,6 @@ Besides polling every 60 seconds, the integration keeps a SignalR connection to 
 1. In HACS, add `https://github.com/petarlaf/remeha_home_baxi_hvac` as a custom repository of type Integration.
 2. Install "Remeha Home" and restart Home Assistant.
 
-If HACS fails to download releases with `Got more than 8190 bytes when reading`, that is a HACS problem with GitHub's current download headers ([hacs/integration#5643](https://github.com/hacs/integration/issues/5643)). Install manually until a fixed HACS version is out.
-
 ### Manual
 
 1. Download `remeha_home.zip` from the [latest release](https://github.com/petarlaf/remeha_home_baxi_hvac/releases/latest).
