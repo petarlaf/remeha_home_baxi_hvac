@@ -96,6 +96,12 @@ This integration aims to create the following entities based on your system's ca
 
 *   `remeha_home.get_schedule` / `remeha_home.set_schedule` (climate entities): read or replace a time program (`program_type` heating 1-3 or cooling 1). Switch points are `{day, time, activity}`; call `get_schedule` first and edit its output, since the day numbering is the API's own (0-6).
 *   `remeha_home.get_hot_water_schedule` / `remeha_home.set_hot_water_schedule` (water heater): the same for the hot water program, with switch points `{day, time, comfortActive}`.
+*   `remeha_home.set_holiday` (`start_date`, `end_date`, optional appliance `device_id`): holiday mode for whole days. The cloud keeps dates only, starts at once when today is in range, and while active puts every climate zone in frost protection and turns hot water off. Before setting it, the integration saves each zone's mode, program and setpoint, the hot water mode and the appliance operating mode (kept across restarts).
+*   `remeha_home.clear_holiday` (optional `device_id`): ends the holiday now and restores the saved modes. The cloud itself does not restore them, so the same restore also runs on the first poll after a holiday set from Home Assistant is cancelled in the app or has ended. Restoring briefly switches an Off appliance on (zone mode writes do that) and then back Off. A holiday set in the app is not restored, because nothing was saved.
+
+### Push updates
+
+The integration keeps a SignalR connection to the Remeha cloud, as the official app does. When the cloud reports a change (from the app, a thermostat or the appliance), Home Assistant refreshes within a few seconds instead of waiting for the next 60 second poll. Polling continues, so a dropped push connection only slows updates down; it reconnects with backoff and renews its token before it expires. Its state is in the diagnostics download under `push`.
 
 *(Availability of some sensors/switches depends on your specific appliance model and configuration)*
 
@@ -124,7 +130,7 @@ This integration aims to create the following entities based on your system's ca
 
 ## Diagnostics
 
-Open `Settings` > `Devices & Services` > `Remeha Home` and choose `Download diagnostics`. The file contains the integration version, the entry and coordinator state, the dashboard, technical details (gateway software and hardware versions), active errors, the latest daily consumption and the heating curve and activity settings. Passwords, tokens, your account email, the home name, location and hardware serial numbers are redacted before the file is created. Appliance and zone IDs are kept so they can be matched to entities.
+Open `Settings` > `Devices & Services` > `Remeha Home` and choose `Download diagnostics`. The file contains the integration version, the entry and coordinator state, the dashboard, technical details (gateway software and hardware versions), active errors, the latest daily consumption, the heating curve and activity settings, and the push connection state. Passwords, tokens, your account email, the home name, location and hardware serial numbers are redacted before the file is created. Appliance and zone IDs are kept so they can be matched to entities.
 
 ## Known Issues / Future Work
 

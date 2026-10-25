@@ -58,3 +58,29 @@ set_hot_water_schedule:
       example: '[{"day": 0, "time": "06:00", "comfortActive": true}, {"day": 0, "time": "22:00", "comfortActive": false}]'
       selector:
         object:
+
+set_holiday:
+  fields:
+    start_date:
+      required: true
+      example: "2026-12-20"
+      selector:
+        date:
+    end_date:
+      required: true
+      example: "2026-12-27"
+      selector:
+        date:
+    device_id:
+      selector:
+        device:
+          integration: remeha_home
+          multiple: true
+
+clear_holiday:
+  fields:
+    device_id:
+      selector:
+        device:
+          integration: remeha_home
+          multiple: true

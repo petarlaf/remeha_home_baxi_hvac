@@ -12,7 +12,7 @@ kept because they are needed to match entities to the API while debugging.
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.diagnostics import REDACTED, async_redact_data
@@ -100,6 +100,16 @@ async def async_get_config_entry_diagnostics(
             else None
         ),
     }
+    signalr = hass.data[DOMAIN][entry.entry_id].get("signalr")
+    if signalr is not None:
+        result["push"] = {
+            "connected": signalr.connected,
+            "connected_since": _epoch_iso(signalr.connected_since),
+            "connections": signalr.connections,
+            "messages": signalr.messages,
+            "last_message": _epoch_iso(signalr.last_message),
+            "last_error": signalr.last_error,
+        }
     result["dashboard"] = _dashboard_snapshot(coordinator.data)
     result["technical_details"] = coordinator.technical_info
     result["active_errors"] = coordinator.appliance_active_errors
@@ -134,6 +144,13 @@ def _dashboard_snapshot(dashboard: dict | None) -> dict | None:
 def _iso(value: Any) -> Any:
     """Return ISO 8601 text for datetimes so the result is JSON serialisable."""
     return value.isoformat() if isinstance(value, datetime) else value
+
+
+def _epoch_iso(value: float | None) -> str | None:
+    """Return an epoch timestamp as an ISO string in UTC."""
+    if value is None:
+        return None
+    return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()
 
 
 def _redact(data: Any) -> Any:

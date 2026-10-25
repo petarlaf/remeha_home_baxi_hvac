@@ -132,6 +132,28 @@ class RemehaHomeAPI:
         response.raise_for_status()
         return await response.json()
 
+    async def async_set_holiday(self, appliance_id: str, start: str, end: str) -> None:
+        """Set the appliance holiday period (UTC timestamps; the cloud keeps dates).
+
+        Start and end in the past clear the holiday.
+        """
+        response = await self._async_api_request(
+            "POST",
+            f"/appliances/{appliance_id}/holidayschedule",
+            json={"holidayModeStartTime": start, "holidayModeEndTime": end},
+        )
+        response.raise_for_status()
+
+    async def async_negotiate_signalr(self) -> dict:
+        """Negotiate a SignalR connection for push updates.
+
+        Returns the Azure SignalR ``url`` and the client ``accessToken``. The
+        request has no body, the same as the official app sends.
+        """
+        response = await self._async_api_request("POST", "/homes/signalr/negotiate")
+        response.raise_for_status()
+        return await response.json()
+
     async def async_get_appliance_technical_information(
         self, appliance_id: str
     ) -> dict:
